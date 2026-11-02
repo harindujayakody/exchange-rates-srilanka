@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
-  Activity, AlertTriangle, ArrowDown, ArrowUp, Clock, ExternalLink, Hand, Landmark, Loader2, RefreshCw, Timer,
-  TrendingDown, TrendingUp, Trophy,
+  Activity, AlertTriangle, ArrowDown, ArrowUp, Clock, ExternalLink, Hand, Landmark, Loader2, RefreshCw, Search, Timer,
+  TrendingDown, TrendingUp, Trophy, X,
 } from "lucide-react"
 import { Line, LineChart, Tooltip as ChartTooltip, YAxis } from "recharts"
 import { toast } from "sonner"
@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
 import { Toaster } from "@/components/ui/sonner"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
@@ -151,7 +151,6 @@ export default function App() {
     [status, currency],
   )
   const top = useMemo(() => bestOf(rows), [rows])
-  const best = { buying: top?.buying.value, selling: top?.selling.value }
   const manualLeft = status?.manual.remaining ?? 0
 
   return (
@@ -224,115 +223,274 @@ export default function App() {
             </div>
           </section>
 
-          <Tabs defaultValue="compare" className="gap-4">
-            <TabsList>
-              <TabsTrigger value="compare">Compare banks</TabsTrigger>
-              <TabsTrigger value="banks">By bank</TabsTrigger>
-            </TabsList>
+          <TopCurrencies status={status} currency={currency} onPick={setCurrency} />
 
-            <TabsContent value="compare">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-heading">{currency} to LKR</CardTitle>
-                  <CardDescription>Buying: what the bank pays you. Selling: what you pay the bank.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {!status ? <TableSkeleton /> : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Bank</TableHead>
-                          <TableHead className="text-right">Buying</TableHead>
-                          <TableHead className="text-right">Selling</TableHead>
-                          <TableHead className="hidden text-right md:table-cell">Spread</TableHead>
-                          <TableHead className="hidden sm:table-cell">Bank updated</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {rows.map(({ bank, rate }) => (
-                          <TableRow key={bank.id}>
-                            <TableCell>
-                              <div className="flex items-center gap-2.5 font-medium">
-                                <span className="hidden sm:contents"><BankLogo bank={bank} /></span>
-                                {bank.name}
-                                <BankState bank={bank} />
-                              </div>
-                            </TableCell>
-                            {rate ? (
-                              <>
-                                <RateCell value={rate.buying} best={rate.buying === best.buying} />
-                                <RateCell value={rate.selling} best={rate.selling === best.selling} />
-                                <TableCell className="hidden text-right font-mono tabular-nums text-muted-foreground md:table-cell">
-                                  {num(rate.selling - rate.buying)}
-                                </TableCell>
-                              </>
-                            ) : (
-                              <TableCell colSpan={3} className="text-right text-muted-foreground">
-                                {bank.fetchedAt || bank.error ? "Not offered" : "Loading…"}
-                              </TableCell>
-                            )}
-                            <TableCell className="hidden text-muted-foreground sm:table-cell">{bankClock(bank.bankUpdatedAt)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="banks">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {(status?.banks ?? []).map((bank) => (
-                  <Card key={bank.id}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between gap-2">
-                        <CardTitle className="flex items-center gap-2.5 font-heading"><BankLogo bank={bank} /> {bank.name} <BankState bank={bank} /></CardTitle>
-                        <a href={bank.url} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground"
-                          aria-label={`Open ${bank.name} rates page`}>
-                          <ExternalLink className="size-4" />
-                        </a>
-                      </div>
-                      <CardDescription className="space-y-0.5">
-                        <span className="block">Bank updated: {bankClock(bank.bankUpdatedAt)}</span>
-                        <span className="block">Fetched {relative(bank.fetchedAt, now)}</span>
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {bank.rates.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">{bank.error ?? "Loading…"}</p>
-                      ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Currency</TableHead>
-                              <TableHead className="text-right">Buying</TableHead>
-                              <TableHead className="text-right">Selling</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {bank.rates.map((r) => (
-                              <TableRow key={r.currency}>
-                                <TableCell className="font-mono font-medium">{r.currency}</TableCell>
-                                <TableCell className="text-right font-mono tabular-nums">{num(r.buying)}</TableCell>
-                                <TableCell className="text-right font-mono tabular-nums">{num(r.selling)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
-          </Tabs>
+          <Explore status={status} currency={currency} onPick={setCurrency} now={now} />
         </main>
 
         <Footer banks={status?.banks ?? []} />
       </div>
       <Toaster theme="dark" position="bottom-right" />
     </TooltipProvider>
+  )
+}
+
+// Shown in this order when offered; the first 10 a bank offers make the grid.
+const TOP = ["USD", "EUR", "GBP", "AUD", "CAD", "JPY", "SGD", "CHF", "AED", "SAR", "INR", "CNY", "QAR", "KWD", "NZD"]
+const currencyNames = new Intl.DisplayNames(["en"], { type: "currency" })
+const currencyName = (code: string) => { try { return currencyNames.of(code) ?? code } catch { return code } }
+const ratesFor = (banks: Bank[], code: string) => banks.map((bank) => ({ bank, rate: bank.rates.find((r) => r.currency === code) }))
+
+function SectionTitle({ title, hint, children }: { title: string; hint: string; children?: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+        <p className="text-sm text-muted-foreground">{hint}</p>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function TopCurrencies({ status, currency, onPick }: { status: Status | null; currency: string; onPick: (c: string) => void }) {
+  const banks = status?.banks ?? []
+  const codes = TOP.filter((c) => banks.some((b) => b.rates.some((r) => r.currency === c))).slice(0, 10)
+  return (
+    <section className="space-y-3" aria-label="Top currencies">
+      <SectionTitle title="Top currencies" hint="Best telegraphic transfer rate for each, across every bank. Tap one to chart it." />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {!status
+          ? Array.from({ length: 10 }, (_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)
+          : codes.map((code) => {
+              const rows = ratesFor(banks, code)
+              const top = bestOf(rows)
+              const count = rows.filter((r) => r.rate).length
+              const active = code === currency
+              return (
+                <button key={code} onClick={() => { onPick(code); window.scrollTo({ top: 0, behavior: "smooth" }) }}
+                  aria-pressed={active}
+                  className={`group flex flex-col gap-3 rounded-xl border bg-card p-3.5 text-left transition-all hover:-translate-y-0.5 hover:border-foreground/25 focus-visible:outline-2 focus-visible:outline-up ${active ? "border-up/60 ring-1 ring-up/40" : ""}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-mono text-lg font-semibold leading-none">{code}</div>
+                      <div className="mt-1 truncate text-xs text-muted-foreground">{currencyName(code)}</div>
+                    </div>
+                    <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">{count} banks</span>
+                  </div>
+                  {top && (
+                    <dl className="space-y-1.5 text-xs">
+                      <div>
+                        <dt className="text-muted-foreground">Best buying</dt>
+                        <dd className="flex items-baseline justify-between gap-2">
+                          <span className="font-mono text-sm font-semibold text-up tabular-nums">{num(top.buying.value)}</span>
+                          <span className="truncate text-muted-foreground">{top.buying.banks[0].name.replace(/ Bank$/, "")}</span>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">Best selling</dt>
+                        <dd className="flex items-baseline justify-between gap-2">
+                          <span className="font-mono text-sm font-semibold tabular-nums">{num(top.selling.value)}</span>
+                          <span className="truncate text-muted-foreground">{top.selling.banks[0].name.replace(/ Bank$/, "")}</span>
+                        </dd>
+                      </div>
+                    </dl>
+                  )}
+                </button>
+              )
+            })}
+      </div>
+    </section>
+  )
+}
+
+// Search runs on the rates already loaded in the page: no extra requests, no tokens.
+function Explore({ status, currency, onPick, now }: { status: Status | null; currency: string; onPick: (c: string) => void; now: number }) {
+  const [query, setQuery] = useState("")
+  const q = query.trim().toLowerCase()
+  const banks = status?.banks ?? []
+  const allCodes = [...new Set(banks.flatMap((b) => b.rates.map((r) => r.currency)))].sort()
+  const codeHits = q ? allCodes.filter((c) => c.toLowerCase().includes(q) || currencyName(c).toLowerCase().includes(q)) : []
+  const bankHits = q ? banks.filter((b) => b.name.toLowerCase().includes(q) || b.id.includes(q)) : []
+
+  return (
+    <section className="space-y-3" aria-label="Explore rates">
+      <SectionTitle title="Explore rates" hint={q ? `${codeHits.length} ${codeHits.length === 1 ? "currency" : "currencies"} and ${bankHits.length} ${bankHits.length === 1 ? "bank" : "banks"} match` : `${currency} at every bank. Search to see a bank's full list or another currency.`}>
+        <div className="relative w-full sm:w-80">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search a bank or currency, e.g. Sampath, EUR, yen"
+            aria-label="Search banks and currencies" className="h-10 pr-9 pl-9" />
+          {query && (
+            <button onClick={() => setQuery("")} aria-label="Clear search"
+              className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+      </SectionTitle>
+
+      {!q ? (
+        <CompareTable status={status} currency={currency} />
+      ) : !codeHits.length && !bankHits.length ? (
+        <div className="flex flex-col items-center gap-1 rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
+          <Search className="size-5" aria-hidden />
+          <p>Nothing matches “{query}”.</p>
+          <p className="text-xs">Try a bank name like “Seylan” or a currency like “AUD”.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {codeHits.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-heading">Currencies</CardTitle>
+                <CardDescription>Best rate for each across all banks. Select one to compare every bank.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Currency</TableHead>
+                      <TableHead className="text-right">Best buying</TableHead>
+                      <TableHead className="text-right">Best selling</TableHead>
+                      <TableHead className="hidden text-right sm:table-cell">Banks</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {codeHits.map((code) => {
+                      const rows = ratesFor(banks, code)
+                      const top = bestOf(rows)
+                      return (
+                        <TableRow key={code} className="cursor-pointer" onClick={() => { onPick(code); setQuery("") }}>
+                          <TableCell>
+                            <button className="text-left" onClick={(e) => { e.stopPropagation(); onPick(code); setQuery("") }}>
+                              <span className="font-mono font-semibold">{code}</span>
+                              <span className="ml-2 text-muted-foreground">{currencyName(code)}</span>
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="font-mono text-up tabular-nums">{top ? num(top.buying.value) : "—"}</div>
+                            <div className="text-xs text-muted-foreground">{top?.buying.banks[0].name}</div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="font-mono tabular-nums">{top ? num(top.selling.value) : "—"}</div>
+                            <div className="text-xs text-muted-foreground">{top?.selling.banks[0].name}</div>
+                          </TableCell>
+                          <TableCell className="hidden text-right font-mono text-muted-foreground sm:table-cell">{rows.filter((r) => r.rate).length}</TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+          {bankHits.length > 0 && (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {bankHits.map((bank) => <BankCard key={bank.id} bank={bank} now={now} />)}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function CompareTable({ status, currency }: { status: Status | null; currency: string }) {
+  const rows = ratesFor(status?.banks ?? [], currency)
+  const top = bestOf(rows)
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="font-heading">{currency} to LKR</CardTitle>
+        <CardDescription>Buying: what the bank pays you. Selling: what you pay the bank.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {!status ? <TableSkeleton /> : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Bank</TableHead>
+                <TableHead className="text-right">Buying</TableHead>
+                <TableHead className="text-right">Selling</TableHead>
+                <TableHead className="hidden text-right md:table-cell">Spread</TableHead>
+                <TableHead className="hidden sm:table-cell">Bank updated</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map(({ bank, rate }) => (
+                <TableRow key={bank.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2.5 font-medium">
+                      <span className="hidden sm:contents"><BankLogo bank={bank} /></span>
+                      {bank.name}
+                      <BankState bank={bank} />
+                    </div>
+                  </TableCell>
+                  {rate ? (
+                    <>
+                      <RateCell value={rate.buying} best={rate.buying === top?.buying.value} />
+                      <RateCell value={rate.selling} best={rate.selling === top?.selling.value} />
+                      <TableCell className="hidden text-right font-mono tabular-nums text-muted-foreground md:table-cell">
+                        {num(rate.selling - rate.buying)}
+                      </TableCell>
+                    </>
+                  ) : (
+                    <TableCell colSpan={3} className="text-right text-muted-foreground">
+                      {bank.fetchedAt || bank.error ? "Not offered" : "Loading…"}
+                    </TableCell>
+                  )}
+                  <TableCell className="hidden text-muted-foreground sm:table-cell">{bankClock(bank.bankUpdatedAt)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function BankCard({ bank, now }: { bank: Bank; now: number }) {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2.5 font-heading"><BankLogo bank={bank} /> {bank.name} <BankState bank={bank} /></CardTitle>
+          <a href={bank.url} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground"
+            aria-label={`Open ${bank.name} rates page`}>
+            <ExternalLink className="size-4" />
+          </a>
+        </div>
+        <CardDescription className="space-y-0.5">
+          <span className="block">Bank updated: {bankClock(bank.bankUpdatedAt)}</span>
+          <span className="block">Fetched {relative(bank.fetchedAt, now)}</span>
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {bank.rates.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{bank.error ?? "Loading…"}</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Currency</TableHead>
+                <TableHead className="text-right">Buying</TableHead>
+                <TableHead className="text-right">Selling</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {bank.rates.map((r) => (
+                <TableRow key={r.currency}>
+                  <TableCell className="font-mono font-medium" title={currencyName(r.currency)}>{r.currency}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">{num(r.buying)}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">{num(r.selling)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
