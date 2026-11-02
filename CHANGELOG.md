@@ -2,6 +2,12 @@
 
 All notable changes to LKR Rates. Dates are in Sri Lanka time.
 
+## 1.4.0 — 2026-11-02
+
+### Added
+- **History page** (`/history`) for every currency the banks quote: one row per day (Sri Lanka time) with the best and worst buying rate and the best and worst selling rate, each with its bank, plus the extremes over 1W, 1M, 6M, 1Y or all saved history. Built from the snapshots the server already saves every 3 hours, so it costs no extra requests or tokens.
+- **Page links in the header and footer** (Rates, History) with Lucide icons; every footer link now has an icon.
+
 ## 1.3.0 — 2026-11-02
 
 ### Added

@@ -252,7 +252,7 @@ Solid, square-shouldered, and inverted rather than coloured.
 - **Shape:** tight corners (4px), 40px tall in the header, 36px elsewhere, 14px horizontal padding, Inter 600 at 0.875rem with a 16px icon.
 - **Primary (Refresh):** ink field, paper text, with the remaining manual-refresh count in mono at 70% opacity ("2/2"). The label hides below 640px; the icon and count stay.
 - **On-slab (Share):** paper field, ink text, the inversion of primary.
-- **Segmented (Buying/Selling, chart range):** equal segments in a 1px paper-at-30% frame; the active segment is a paper indicator that slides to it over 300ms on the shared ease, its label turning ink.
+- **Segmented (Buying/Selling, chart range, history range):** equal segments with a sliding indicator over 300ms on the shared ease. Slab tone: 1px paper-at-30% frame, paper indicator, ink label. Page tone: 2px ink frame, ink indicator, paper label.
 - **Outline on ink (Star on GitHub):** transparent with a 1px paper-at-30% outline; hover fills paper at 10%.
 - **Icon buttons (theme, GitHub):** 40px square, no fill at rest, wash fill on hover, 18px icons, each with a tooltip and an aria-label.
 - **Hover / Focus / Disabled:** filled buttons fade to 85% opacity on hover; disabled drops to 40% with a not-allowed cursor; busy swaps the icon for a spinning loader and the label to "Updating". Focus is a global 2px ring-colour outline offset 2px.
@@ -283,9 +283,15 @@ The answer as one solid block: ink on the light theme, snow on the dark.
 - **Focus:** the global 2px ring outline, offset 2px.
 
 ### Navigation
-- **Header:** sticky, opaque paper ground (no blur), 2px ink bottom rule, 64px tall. Left: logo (28px) and "LKR Rates" in Poppins 700 at 1.125rem, a 1px divider, then a status line from 768px ("Updated 12 minutes ago / 9 banks", a 6px ink dot that pulses while updating). Right: Install (when offered), theme and GitHub as 36px ghost icon buttons, a 1px divider, and the primary Refresh button with its manual count.
-- **Footer:** minimal, on the page ground under a 2px ink rule. A wordmark and one-sentence product line; a single row of links (GitHub, API, Telegram bot, Report an issue, MIT License) in graphite turning ink on hover; one line of bank sources; then, over a 1px hairline, the © credit and the indicative-rates disclaimer.
+- **Header:** sticky, opaque paper ground (no blur), 2px ink bottom rule, 64px tall. Left: logo (28px) and "LKR Rates" in Poppins 700 at 1.125rem, a 1px divider, then a status line from 768px ("Updated 12 minutes ago / 9 banks", a 6px ink dot that pulses while updating). Then the page links, Rates (Lucide ChartLine) and History (Lucide History): 36px tall, the current page an inverted ink chip, icon-only on phones. Right: Install (when offered), theme and GitHub as 36px ghost icon buttons, a 1px divider, and the primary Refresh button with its manual count. The status line shows from 1024px.
+- **Footer:** minimal, on the page ground under a 2px ink rule. A wordmark and one-sentence product line; three short link columns, every link with a 14px Lucide icon (Rates and History; GitHub, API, Telegram bot; Report an issue, MIT License), in graphite turning ink on hover; one line of bank sources; then, over a 1px hairline, the © credit and the indicative-rates disclaimer.
 - **Chart hover label:** a paper chip inside the slab (ink text, 4px corners) that follows the cursor: the rate in JetBrains Mono 700 and, under it, the date and bank in graphite. It is not animated, and the chart keeps a fixed height so nothing beside it moves while hovering.
+
+### History page
+- **Head:** the page title in Poppins 800 with the Lucide History icon, one explanatory sentence, then a currency select (flag and code, 2px ink outline) and the range toggle (Segmented, page tone) over a 2px ink rule.
+- **Extremes:** four cells in a ruled band between 2px ink rules (2 x 2 on phones, 4 across from 1024px): best buying, worst buying, best selling, worst selling. Each has a Lucide arrow-to-line icon, the rate in JetBrains Mono 700, and the bank, date and a plain-words hint in graphite.
+- **Daily table:** one row per Sri Lanka day, newest first: day (with the "as at" time of the day's last snapshot), the four rates with their bank under each, and the number of banks. Best columns are bold; nothing is coloured.
+- **Empty and loading:** skeleton rows while the history loads; a sentence when a range has no snapshots.
 
 ### Share card
 A 1080 x 1350 PNG drawn on canvas, always on the dark palette regardless of theme: #0a0a0a ground, #fafafa ink, #a6a6a6 secondary, 80px margins. Order: logo and wordmark with the Colombo-time timestamp, a 3px ink rule, "USD → LKR" in mono 700 with the currency name, the bank name in Poppins 800 at up to 72px (shrinks to fit), the meaning, "Rs" plus the rate in mono 700 at up to 150px (shrinks to fit), the change line in #4ade80 / #ff7b6b, a 5px history line, the top five banks with mono buying and selling columns, then a 3px rule, the disclaimer and the host. It goes to the system share sheet or downloads.

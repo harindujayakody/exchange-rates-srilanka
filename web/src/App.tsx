@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
-  AlertTriangle, ArrowDown, ArrowUp, Download, ExternalLink, Landmark, Loader2, Moon, RefreshCw, Search, Share2, Sun, X,
+  AlertTriangle, ArrowDown, ArrowUp, Braces, Bug, ChartLine, History, Scale, Send, Download, ExternalLink, Landmark, Loader2, Moon, RefreshCw, Search, Share2, Sun, X,
 } from "lucide-react"
 import { Line, LineChart, Tooltip as ChartTooltip, YAxis } from "recharts"
 import { toast } from "sonner"
@@ -12,12 +12,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Toaster } from "@/components/ui/sonner"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { shareCard } from "@/share"
+import HistoryPage from "@/HistoryPage"
 import { Flag } from "@/flags"
 
 const REPO = "https://github.com/harindujayakody/exchnage-rates-srilanka"
 
 type Rate = { currency: string; buying: number; selling: number }
-type Bank = {
+export type Bank = {
   id: string; name: string; short?: string; url: string; rates: Rate[]
   bankUpdatedAt?: string | null; fetchedAt?: string; error?: string | null
 }
@@ -28,11 +29,11 @@ type Status = {
   refreshing: boolean
   manual: { limit: number; remaining: number; resetsAt: string | null }
 }
-type Snapshot = { at: string; rates: Record<string, [number, number]> }
+export type Snapshot = { at: string; rates: Record<string, [number, number]> }
 type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }
 
-const num = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })
-const clock = (iso: string) => new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })
+export const num = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+export const clock = (iso: string) => new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })
 
 // Server sends ISO in Sri Lanka time, or a bare date when the bank only publishes a date.
 function bankClock(iso: string | null | undefined) {
@@ -56,12 +57,12 @@ function relative(iso: string | null | undefined, now: number) {
 const TOP = ["USD", "EUR", "GBP", "AUD", "CAD", "JPY", "SGD", "CHF", "AED", "SAR", "INR", "CNY", "QAR", "KWD", "NZD"]
 const currencyNames = new Intl.DisplayNames(["en"], { type: "currency" })
 // CNH (offshore yuan) is not an ISO code, so browsers have no name for it.
-const currencyName = (code: string) => {
+export const currencyName = (code: string) => {
   if (code === "CNH") return "Chinese Yuan (offshore)"
   try { return currencyNames.of(code) ?? code } catch { return code }
 }
 const ratesFor = (banks: Bank[], code: string) => banks.map((bank) => ({ bank, rate: bank.rates.find((r) => r.currency === code) }))
-const shortName = (b: Bank) => b.short ?? b.name
+export const shortName = (b: Bank) => b.short ?? b.name
 
 type Pick = { banks: Bank[]; value: number }
 function bestOf(rows: { bank: Bank; rate?: Rate }[]) {
@@ -92,6 +93,10 @@ function seriesFrom(history: Snapshot[], bankId: string, side: "buying" | "selli
   })
 }
 
+type Page = "rates" | "history"
+const PATHS: Record<Page, string> = { rates: "/", history: "/history" }
+const pageFromPath = (): Page => (location.pathname.startsWith("/history") ? "history" : "rates")
+
 export default function App() {
   const [status, setStatus] = useState<Status | null>(null)
   const [history, setHistory] = useState<Snapshot[] | null>(null) // null while the history is loading
@@ -101,6 +106,23 @@ export default function App() {
   const [now, setNow] = useState(Date.now())
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"))
   const [install, setInstall] = useState<InstallPrompt | null>(null)
+  const [page, setPage] = useState<Page>(pageFromPath)
+
+  useEffect(() => {
+    const onPop = () => setPage(pageFromPath())
+    window.addEventListener("popstate", onPop)
+    return () => window.removeEventListener("popstate", onPop)
+  }, [])
+  useEffect(() => {
+    document.title = page === "history" ? "Rate history · LKR Rates" : "LKR Rates · Sri Lanka bank exchange rates"
+  }, [page])
+  const go = (p: Page) => (e: React.MouseEvent) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return // let new-tab clicks through
+    e.preventDefault()
+    if (p !== page) window.history.pushState(null, "", PATHS[p])
+    setPage(p)
+    window.scrollTo({ top: 0 })
+  }
 
   const load = useCallback(async () => {
     try {
@@ -181,17 +203,25 @@ export default function App() {
       <div className="flex min-h-svh flex-col bg-background text-foreground">
         <header className="sticky top-0 z-40 border-b-2 border-foreground bg-background">
           <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
-            <a href="/" className="flex shrink-0 items-center gap-2.5 rounded-md" aria-label="LKR Rates home">
+            <a href="/" onClick={go("rates")} className="flex shrink-0 items-center gap-2.5 rounded-md" aria-label="LKR Rates home">
               <img src="/logo.png" alt="" width={28} height={28} className="size-7" />
-              <span className="font-heading text-lg font-bold tracking-tight">LKR Rates</span>
+              <span className="hidden font-heading text-lg font-bold tracking-tight min-[400px]:inline">LKR Rates</span>
             </a>
-            <span className="hidden h-5 w-px bg-border md:block" aria-hidden />
-            <p className="hidden items-center gap-2 text-xs text-muted-foreground md:flex" aria-live="polite">
+            <span className="hidden h-5 w-px bg-border lg:block" aria-hidden />
+            <p className="hidden items-center gap-2 text-xs text-muted-foreground lg:flex" aria-live="polite">
               <span className={`size-1.5 rounded-full bg-foreground ${busy ? "animate-pulse" : ""}`} aria-hidden />
               {busy ? "Updating rates…" : status?.lastRefresh ? `Updated ${relative(status.lastRefresh.at, now)}` : "Loading rates…"}
               <span className="text-border">/</span>
               {status?.banks.length ?? 9} banks
             </p>
+            <nav className="flex items-center gap-1 md:ml-2" aria-label="Pages">
+              {([["rates", "Rates", ChartLine], ["history", "History", History]] as const).map(([p, label, Icon]) => (
+                <a key={p} href={PATHS[p]} onClick={go(p)} aria-current={page === p ? "page" : undefined} aria-label={label}
+                  className={`inline-flex h-9 items-center gap-2 rounded-md px-2.5 text-sm font-semibold transition-colors duration-300 ${page === p ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+                  <Icon className="size-4" aria-hidden /><span className="hidden sm:inline">{label}</span>
+                </a>
+              ))}
+            </nav>
             <nav className="ml-auto flex items-center gap-1" aria-label="Site">
               {install && (
                 <button onClick={installApp} className="inline-flex h-9 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors hover:bg-muted">
@@ -241,17 +271,24 @@ export default function App() {
             </div>
           )}
 
-          <div className="space-y-4">
-            <CurrencyRail top={currencies.top} all={currencies.all} currency={currency} onPick={setCurrency} />
-            <Slab status={status} history={history} currency={currency} now={now} />
-          </div>
+          {page === "history" ? (
+            <HistoryPage banks={status?.banks ?? []} codes={currencies.all.length ? currencies.all : [currency]} currency={currency}
+              history={history} onPick={setCurrency} now={now} />
+          ) : (
+            <>
+              <div className="space-y-4">
+                <CurrencyRail top={currencies.top} all={currencies.all} currency={currency} onPick={setCurrency} />
+                <Slab status={status} history={history} currency={currency} now={now} />
+              </div>
 
-          <TopCurrencies status={status} codes={currencies.top} currency={currency} onPick={setCurrency} />
+              <TopCurrencies status={status} codes={currencies.top} currency={currency} onPick={setCurrency} />
 
-          <Explore status={status} currency={currency} onPick={setCurrency} now={now} />
+              <Explore status={status} currency={currency} onPick={setCurrency} now={now} />
+            </>
+          )}
         </main>
 
-        <Footer banks={status?.banks ?? []} />
+        <Footer banks={status?.banks ?? []} go={go} />
       </div>
       <Toaster theme={dark ? "dark" : "light"} position="bottom-center" />
     </TooltipProvider>
@@ -438,19 +475,22 @@ function Slab({ status, history, currency, now }: { status: Status | null; histo
   )
 }
 
-// One toggle style for every switch on the slab: equal segments and a sliding indicator on the shared ease.
-function Segmented({ label, options, value, onChange, className = "", mono = false }: {
-  label: string; options: string[]; value: string; onChange: (v: string) => void; className?: string; mono?: boolean
+// One toggle style for every switch: equal segments and a sliding indicator on the shared ease.
+// tone "slab" sits on the inverted slab; "page" sits on the page ground.
+export function Segmented({ label, options, value, onChange, className = "", mono = false, tone = "slab" }: {
+  label: string; options: string[]; value: string; onChange: (v: string) => void; className?: string; mono?: boolean; tone?: "slab" | "page"
 }) {
   const i = Math.max(0, options.indexOf(value))
+  const slab = tone === "slab"
   return (
-    <div role="group" aria-label={label} className={`relative grid rounded-md border border-background/30 p-0.5 ${className}`}
+    <div role="group" aria-label={label} className={`relative grid rounded-md border p-0.5 ${slab ? "border-background/30" : "border-2 border-foreground"} ${className}`}
       style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
-      <span aria-hidden className="ease-out-expo absolute top-0.5 bottom-0.5 left-0.5 rounded bg-background transition-transform duration-300"
+      <span aria-hidden className={`ease-out-expo absolute top-0.5 bottom-0.5 left-0.5 rounded transition-transform duration-300 ${slab ? "bg-background" : "bg-foreground"}`}
         style={{ width: `calc((100% - 4px) / ${options.length})`, transform: `translateX(${i * 100}%)` }} />
       {options.map((o) => (
         <button key={o} onClick={() => onChange(o)} aria-pressed={o === value}
-          className={`relative z-10 py-1.5 text-xs font-semibold transition-colors duration-300 ${mono ? "font-mono" : ""} ${o === value ? "text-foreground" : "text-background/70 hover:text-background"}`}>
+          className={`relative z-10 py-1.5 text-xs font-semibold transition-colors duration-300 ${mono ? "font-mono" : ""} ${
+            o === value ? (slab ? "text-foreground" : "text-background") : slab ? "text-background/70 hover:text-background" : "text-muted-foreground hover:text-foreground"}`}>
           {o}
         </button>
       ))}
@@ -470,7 +510,7 @@ function SlabRow({ label, value, bank }: { label: string; value: string; bank?: 
   )
 }
 
-function SectionHead({ title, hint, children }: { title: string; hint: string; children?: React.ReactNode }) {
+export function SectionHead({ title, hint, children }: { title: string; hint: string; children?: React.ReactNode }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-4 border-b-2 border-foreground pb-3">
       <div>
@@ -688,7 +728,7 @@ function BankSheet({ bank, now }: { bank: Bank; now: number }) {
   )
 }
 
-function Footer({ banks }: { banks: Bank[] }) {
+function Footer({ banks, go }: { banks: Bank[]; go: (p: Page) => (e: React.MouseEvent) => void }) {
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !(navigator as Navigator & { standalone?: boolean }).standalone
   const link = "text-muted-foreground transition-colors hover:text-foreground"
   return (
@@ -705,13 +745,21 @@ function Footer({ banks }: { banks: Bank[] }) {
               {ios && " On iPhone, tap Share then “Add to Home Screen” to install."}
             </p>
           </div>
-          <nav aria-label="Project" className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-            <a href={REPO} target="_blank" rel="noreferrer" className={`inline-flex items-center gap-1.5 ${link}`}><GitHubIcon className="size-3.5" /> GitHub</a>
-            <a href={`${REPO}#api`} target="_blank" rel="noreferrer" className={link}>API</a>
-            <a href={`${REPO}#telegram-bot`} target="_blank" rel="noreferrer" className={link}>Telegram bot</a>
-            <a href={`${REPO}/issues`} target="_blank" rel="noreferrer" className={link}>Report an issue</a>
-            <a href={`${REPO}/blob/main/LICENSE`} target="_blank" rel="noreferrer" className={link}>MIT License</a>
-          </nav>
+          <div className="grid grid-cols-2 gap-x-10 gap-y-2 text-sm sm:flex sm:gap-x-12">
+            <nav aria-label="Pages" className="flex flex-col gap-2">
+              <a href={PATHS.rates} onClick={go("rates")} className={`inline-flex items-center gap-2 ${link}`}><ChartLine className="size-3.5" aria-hidden /> Rates</a>
+              <a href={PATHS.history} onClick={go("history")} className={`inline-flex items-center gap-2 ${link}`}><History className="size-3.5" aria-hidden /> History</a>
+            </nav>
+            <nav aria-label="Project" className="flex flex-col gap-2">
+              <a href={REPO} target="_blank" rel="noreferrer" className={`inline-flex items-center gap-2 ${link}`}><GitHubIcon className="size-3.5" /> GitHub</a>
+              <a href={`${REPO}#api`} target="_blank" rel="noreferrer" className={`inline-flex items-center gap-2 ${link}`}><Braces className="size-3.5" aria-hidden /> API</a>
+              <a href={`${REPO}#telegram-bot`} target="_blank" rel="noreferrer" className={`inline-flex items-center gap-2 ${link}`}><Send className="size-3.5" aria-hidden /> Telegram bot</a>
+            </nav>
+            <nav aria-label="Help" className="flex flex-col gap-2">
+              <a href={`${REPO}/issues`} target="_blank" rel="noreferrer" className={`inline-flex items-center gap-2 ${link}`}><Bug className="size-3.5" aria-hidden /> Report an issue</a>
+              <a href={`${REPO}/blob/main/LICENSE`} target="_blank" rel="noreferrer" className={`inline-flex items-center gap-2 ${link}`}><Scale className="size-3.5" aria-hidden /> MIT License</a>
+            </nav>
+          </div>
         </div>
         <p className="text-xs leading-relaxed text-muted-foreground">
           <span className="font-medium text-foreground">Sources: </span>

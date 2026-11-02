@@ -32,6 +32,7 @@ Sending money home or selling dollars in Sri Lanka means opening nine bank websi
 
 - **The answer first.** A solid black slab (white in dark mode) names the bank paying the most for your currency, the rate at full size, how it moved, and the history line. Scrub the chart to see any past point; switch to selling or to a single bank.
 - **9 banks:** Commercial Bank, Bank of Ceylon, People's Bank, Sampath, NDB, Seylan, Nations Trust, DFCC and NSB.
+- **History page** at `/history`: for any currency, the best and worst buying and selling rate of each day with the bank behind it, and the extremes over 1W to all time.
 - **Top currencies and search.** The ten most-used currencies with the best bank for each, and search by bank or currency ("sampath", "eur", "yen"). Runs on the rates already loaded, so no extra requests or tokens.
 - **Flags** in front of every currency, from inline SVGs.
 - **Share like an exchange app.** One tap makes a 1080×1350 rate card and opens your phone's share sheet for WhatsApp, Telegram, Instagram and others. On desktop it saves the PNG.
@@ -118,7 +119,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://your-host/rates?currency=USD"
 | `GET /banks` | Bank ids |
 | `GET /openapi.json` | OpenAPI 3.1 description of these endpoints |
 | `GET /api/status` | What the dashboard shows: banks, refresh times, manual limit (no token usage) |
-| `GET /api/history?currency=USD` | Every saved snapshot: `[{ at, rates: { boc: [buying, selling] } }]` |
+| `GET /api/history?currency=USD` | Every saved snapshot: `[{ at, rates: { boc: [buying, selling] } }]` (what the History page is built from) |
 | `POST /api/refresh` | Manual refresh. Only accepted from the app's own page, 2 per hour |
 
 ```jsonc
@@ -178,6 +179,7 @@ DESIGN.md         the design system
 CHANGELOG.md      release notes
 web/              React + Vite + shadcn/ui dashboard
 web/public/logos  bank logos
+web/src/HistoryPage.tsx  the History page
 web/src/card.js   the share image, drawn the same way in the browser and the bot
 web/src/share.ts  sharing it from the web page
 web/src/assets/flags  currency flags (country-flag-icons, MIT)
