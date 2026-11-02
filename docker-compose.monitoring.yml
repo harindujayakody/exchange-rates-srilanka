@@ -1,9 +1,11 @@
-# Dozzle: a live log viewer for the containers on this Docker host.
-#   docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
-# then open http://localhost:8080
+# Monitoring and management for the containers on this Docker host:
+#   Dozzle    live logs          http://localhost:8080
+#   Portainer manage containers  https://localhost:9443  (create the admin user within 5 minutes of first start)
 #
-# Dozzle can read every container's logs, so it only listens on this machine (127.0.0.1).
-# To reach it from elsewhere, put it behind a password first (Dozzle "simple" auth, or Coolify's own domain + basic auth).
+#   docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+#
+# Both can read (Portainer can also control) every container, so they only listen on this machine (127.0.0.1).
+# To reach them from elsewhere, put them behind a password and HTTPS first.
 services:
   dozzle:
     image: amir20/dozzle:v8
@@ -14,3 +16,15 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       DOZZLE_NO_ANALYTICS: "true"
+
+  portainer:
+    image: portainer/portainer-ce:lts
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+
+volumes:
+  portainer-data:

@@ -6,7 +6,7 @@ All notable changes to LKR Rates. Dates are in Sri Lanka time.
 
 ### Added
 - **Docker:** a multi-stage `Dockerfile` (builds the web app, non-root user, bot image fonts included, health check) and `docker-compose.yml` with a persistent `lkr-data` volume.
-- **Dozzle log monitoring:** `docker-compose.monitoring.yml`, bound to `127.0.0.1` by default.
+- **Portainer CE and Dozzle:** `docker-compose.monitoring.yml` runs Portainer (container management, port 9443) and Dozzle (live logs, port 8080), both bound to `127.0.0.1`.
 - **Coolify deployment guide** in the README.
 - `GET /healthz` for Docker, Coolify and uptime monitors, plus one log line per refresh (banks ok, AI requests, failures).
 

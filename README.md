@@ -90,13 +90,16 @@ The image builds the web app, includes the optional image library for the bot, r
 
 **Run only one copy with the same Telegram token.** Two copies fight over Telegram updates ("Conflict: terminated by other getUpdates request") and the bot stops answering reliably.
 
-### Watch the logs with Dozzle
+### Manage and monitor: Portainer and Dozzle
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d   # http://localhost:8080
+docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
 ```
 
-[Dozzle](https://dozzle.dev) shows live logs for every container on the host. It can read all of them, so it listens on `127.0.0.1` only. Put it behind a password before exposing it anywhere.
+- **[Portainer CE](https://www.portainer.io)** at https://localhost:9443: start, stop, update and inspect containers, volumes and logs. Create the admin user within 5 minutes of the first start, or Portainer locks setup until you restart it. The certificate is self-signed, so the browser warns once.
+- **[Dozzle](https://dozzle.dev)** at http://localhost:8080: live logs for every container.
+
+Both can read every container, and Portainer can also control them, so they listen on `127.0.0.1` only. Put them behind a password and HTTPS before exposing them anywhere.
 
 ### Deploy on Coolify
 
