@@ -387,7 +387,7 @@ if (process.argv[1]?.endsWith('server.mjs')) {
   const wait = Math.max(0, new Date(state.lastRefresh?.at ?? 0).getTime() + REFRESH_MS - Date.now());
   state.nextRefresh = new Date(Date.now() + wait).toISOString();
   setTimeout(() => { scheduled(); setInterval(scheduled, REFRESH_MS); }, wait);
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 5821;
   server.listen(port, process.env.HOST, () => console.log(`http://localhost:${port}`));
   if (process.env.TELEGRAM_BOT_TOKEN) {
     createBot({

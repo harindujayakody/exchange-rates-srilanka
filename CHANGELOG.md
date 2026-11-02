@@ -12,6 +12,7 @@ All notable changes to LKR Rates. Dates are in Sri Lanka time.
 
 ### Changed
 - The repository is now `harindujayakody/exchange-rates-srilanka`.
+- **Default port is now 5821** (was 3000), so it no longer clashes with common dev servers. Set `PORT` to use another.
 
 ## 1.4.0 — 2026-11-02
 

@@ -69,7 +69,7 @@ cd exchange-rates-srilanka
 cp .env.example .env          # then paste your OpenRouter key
 npm install                   # optional: lets the Telegram bot send rate images
 npm run build                 # builds the web UI
-npm run dev                   # http://localhost:3000
+npm run dev                   # http://localhost:5821
 ```
 
 Get a free key at [openrouter.ai/keys](https://openrouter.ai/keys). On a host that sets environment variables for you, run `npm start` instead of `npm run dev`.
@@ -82,7 +82,7 @@ Open the site in Chrome or Edge (Windows, macOS, Android) and choose **Install a
 
 ```bash
 cp .env.example .env              # add your keys
-docker compose up -d --build      # http://localhost:3000
+docker compose up -d --build      # http://localhost:5821
 docker compose logs -f app        # one line per refresh: banks ok, AI requests, failures
 ```
 
@@ -109,8 +109,8 @@ Both can read every container, and Portainer can also control them, so they list
 2. **New Resource → Public repository** (or connect GitHub) → `https://github.com/harindujayakody/exchange-rates-srilanka`, branch `main`.
 3. Build pack: **Docker Compose** (uses `docker-compose.yml`). Coolify keeps the `lkr-data` volume across deploys.
 4. **Environment variables:** `OPENROUTER_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ADMIN_IDS`, `TRUST_PROXY=1`, and `PUBLIC_URL` once you have a domain.
-5. **Domain:** add one for the `app` service on port 3000. Coolify issues HTTPS, which the installable app needs.
-6. **Health check:** path `/healthz`, port 3000. Turn on Coolify notifications (Telegram, email or Discord) to hear when it goes unhealthy or a deploy fails.
+5. **Domain:** add one for the `app` service on port 5821. Coolify issues HTTPS, which the installable app needs.
+6. **Health check:** path `/healthz`, port 5821. Turn on Coolify notifications (Telegram, email or Discord) to hear when it goes unhealthy or a deploy fails.
 7. **Logs:** Coolify shows each container's logs. For Dozzle on the same server, add it as a separate service (Coolify's one-click catalogue or `docker-compose.monitoring.yml`) and keep it behind authentication.
 
 ## Telegram bot
@@ -187,7 +187,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://your-host/rates?currency=USD"
 | Variable | Default | |
 |---|---|---|
 | `OPENROUTER_API_KEY` | required | Your OpenRouter key |
-| `PORT` | `3000` | |
+| `PORT` | `5821` | |
 | `HOST` | all interfaces | Set `127.0.0.1` to keep it local |
 | `REFRESH_HOURS` | `3` | Free models allow about 50 requests a day. One refresh uses about 8 |
 | `OPENROUTER_MODELS` | Nemotron 3.5 Super, Gemma 4 31B (both `:free`) | Tried in order |
