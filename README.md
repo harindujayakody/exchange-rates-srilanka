@@ -92,8 +92,11 @@ The image builds the web app, includes the optional image library for the bot, r
 
 ### Manage and monitor: Portainer and Dozzle
 
+This is a separate install from the app. Start it once and it keeps running on its own, watching and managing every container on the machine, LKR Rates included:
+
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+docker compose -f docker-compose.monitoring.yml up -d     # Portainer + Dozzle only
+docker compose up -d --build                              # LKR Rates only, start or update it any time
 ```
 
 - **[Portainer CE](https://www.portainer.io)** at https://localhost:9443: start, stop, update and inspect containers, volumes and logs. Create the admin user within 5 minutes of the first start, or Portainer locks setup until you restart it. The certificate is self-signed, so the browser warns once.

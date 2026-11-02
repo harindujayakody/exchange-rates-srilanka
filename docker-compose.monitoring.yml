@@ -2,10 +2,13 @@
 #   Dozzle    live logs          http://localhost:8080
 #   Portainer manage containers  https://localhost:9443  (create the admin user within 5 minutes of first start)
 #
-#   docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+# A separate install from the app: start it once, it keeps running, and it sees and manages every
+# container on this host (the app included) through the Docker socket.
+#   docker compose -f docker-compose.monitoring.yml up -d
 #
 # Both can read (Portainer can also control) every container, so they only listen on this machine (127.0.0.1).
 # To reach them from elsewhere, put them behind a password and HTTPS first.
+name: monitoring
 services:
   dozzle:
     image: amir20/dozzle:v8
