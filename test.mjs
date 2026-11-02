@@ -1,7 +1,7 @@
 // node test.mjs  (no API key needed)
 import assert from 'node:assert';
 import { pageText, cleanRates, allowManual, ttColumns, bankTime, overLimit, trackUsage, authorized } from './server.mjs';
-import { views, resolve, best, flag } from './bot.mjs';
+import { views, resolve, best, flag, cardData } from './bot.mjs';
 
 assert.strictEqual(flag('USD'), '🇺🇸');
 assert.strictEqual(flag('EUR'), '🇪🇺');
@@ -33,6 +33,21 @@ const banks = [
 assert.strictEqual(best(banks, 'USD').buy.bank.id, 'seylan');
 assert.strictEqual(best(banks, 'USD').sell.bank.id, 'seylan');
 assert.strictEqual(best(banks, 'EUR'), null);
+
+// Share image data: best buying bank, the week's best-rate line, change from the week's first point.
+const now2 = Date.parse('2026-11-02T12:00:00Z');
+const hist = [
+  { at: '2026-10-20T00:00:00Z', rates: { boc: { USD: [300, 310] } } },          // older than a week: ignored
+  { at: '2026-10-30T00:00:00Z', rates: { boc: { USD: [327, 337] }, seylan: { USD: [328, 336] } } },
+  { at: '2026-11-02T00:00:00Z', rates: { boc: { USD: [328.1, 337.1] }, seylan: { USD: [329, 336] } } },
+];
+const card = cardData(banks, hist, 'USD', now2);
+assert.strictEqual(card.bank, 'Seylan Bank');
+assert.deepStrictEqual(card.series, [328, 329]);
+assert.strictEqual(card.change.abs, 1);
+assert.strictEqual(card.change.good, true);
+assert.deepStrictEqual(card.rows.map(r => r.name), ['Seylan Bank', 'Bank of Ceylon']);
+assert.strictEqual(cardData(banks, hist, 'EUR', now2), null);
 assert.deepStrictEqual(resolve('usd', banks), { type: 'currency', code: 'USD' });
 assert.deepStrictEqual(resolve('yen', banks), { type: 'currency', code: 'JPY' });
 assert.strictEqual(resolve('/bank boc', banks).bank.id, 'boc');

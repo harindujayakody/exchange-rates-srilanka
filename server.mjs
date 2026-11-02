@@ -5,6 +5,7 @@ import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises
 import path from 'node:path';
 import { timingSafeEqual } from 'node:crypto';
 import { createBot } from './bot.mjs';
+import { createCardRenderer } from './cardimage.mjs';
 
 // tt = [buying, selling] positions of the Telegraphic Transfer rates among a row's numbers (0 = first).
 // All checked against the live pages on 2026-11-02.
@@ -376,7 +377,10 @@ if (process.argv[1]?.endsWith('server.mjs')) {
     createBot({
       token: process.env.TELEGRAM_BOT_TOKEN,
       admins: (process.env.TELEGRAM_ADMIN_IDS || '').split(',').map(s => s.trim()).filter(Boolean),
-      getBanks: bankList, refreshBank, getUsage: () => state.usage,
+      getBanks: bankList, refreshBank, getUsage: () => state.usage, getHistory: () => history,
+      renderCard: await createCardRenderer(),
+      // Shown on the share image's footer.
+      host: process.env.PUBLIC_URL ? new URL(process.env.PUBLIC_URL).host : 'github.com/harindujayakody',
     }).start();
   }
 }

@@ -94,7 +94,7 @@ function seriesFrom(history: Snapshot[], bankId: string, side: "buying" | "selli
 
 export default function App() {
   const [status, setStatus] = useState<Status | null>(null)
-  const [history, setHistory] = useState<Snapshot[]>([])
+  const [history, setHistory] = useState<Snapshot[] | null>(null) // null while the history is loading
   const [loadError, setLoadError] = useState(false)
   const [manualRunning, setManualRunning] = useState(false)
   const [currency, setCurrency] = useState("USD")
@@ -124,6 +124,7 @@ export default function App() {
 
   const lastAt = status?.lastRefresh?.at
   useEffect(() => {
+    setHistory(null)
     fetch(`/api/history?currency=${currency}`).then((r) => (r.ok ? r.json() : [])).then(setHistory).catch(() => setHistory([]))
   }, [currency, lastAt])
 
@@ -143,8 +144,14 @@ export default function App() {
 
   function toggleTheme() {
     const next = !dark
-    setDark(next)
-    document.documentElement.classList.toggle("dark", next)
+    const apply = () => {
+      setDark(next)
+      document.documentElement.classList.toggle("dark", next)
+    }
+    // Cross-fade the whole page where supported; otherwise switch instantly.
+    const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown }
+    if (doc.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches) doc.startViewTransition(apply)
+    else apply()
     try { localStorage.setItem("theme", next ? "dark" : "light") } catch { /* private mode: theme just won't persist */ }
   }
 
@@ -173,38 +180,47 @@ export default function App() {
     <TooltipProvider>
       <div className="flex min-h-svh flex-col bg-background text-foreground">
         <header className="sticky top-0 z-40 border-b-2 border-foreground bg-background">
-          <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
-            <a href="/" className="flex items-center gap-2.5 rounded-md" aria-label="LKR Rates home">
-              <img src="/logo.png" alt="" width={32} height={32} className="size-8" />
-              <span className="font-heading text-xl font-bold tracking-tight">LKR Rates</span>
+          <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
+            <a href="/" className="flex shrink-0 items-center gap-2.5 rounded-md" aria-label="LKR Rates home">
+              <img src="/logo.png" alt="" width={28} height={28} className="size-7" />
+              <span className="font-heading text-lg font-bold tracking-tight">LKR Rates</span>
             </a>
-            <div className="flex items-center gap-1">
+            <span className="hidden h-5 w-px bg-border md:block" aria-hidden />
+            <p className="hidden items-center gap-2 text-xs text-muted-foreground md:flex" aria-live="polite">
+              <span className={`size-1.5 rounded-full bg-foreground ${busy ? "animate-pulse" : ""}`} aria-hidden />
+              {busy ? "Updating rates…" : status?.lastRefresh ? `Updated ${relative(status.lastRefresh.at, now)}` : "Loading rates…"}
+              <span className="text-border">/</span>
+              {status?.banks.length ?? 9} banks
+            </p>
+            <nav className="ml-auto flex items-center gap-1" aria-label="Site">
               {install && (
-                <button onClick={installApp} aria-label="Install app"
-                  className="inline-flex h-10 items-center gap-2 rounded-md px-2.5 text-sm font-semibold transition-colors hover:bg-muted">
-                  <Download className="size-[18px]" aria-hidden /><span className="hidden sm:inline">Install</span>
+                <button onClick={installApp} className="inline-flex h-9 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors hover:bg-muted">
+                  <Download className="size-4" aria-hidden /><span className="hidden sm:inline">Install</span><span className="sr-only sm:hidden">Install app</span>
                 </button>
               )}
               <Tooltip>
                 <TooltipTrigger render={<button onClick={toggleTheme} aria-label={dark ? "Switch to light theme" : "Switch to dark theme"} />}
-                  className="inline-flex size-10 items-center justify-center rounded-md transition-colors hover:bg-muted">
-                  {dark ? <Sun className="size-[18px]" aria-hidden /> : <Moon className="size-[18px]" aria-hidden />}
+                  className="inline-flex size-9 items-center justify-center rounded-md transition-colors hover:bg-muted">
+                  <span key={String(dark)} className="switch-in inline-flex">
+                    {dark ? <Sun className="size-4" aria-hidden /> : <Moon className="size-4" aria-hidden />}
+                  </span>
                 </TooltipTrigger>
                 <TooltipContent>{dark ? "Light theme" : "Dark theme"}</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger render={<a href={REPO} target="_blank" rel="noreferrer" aria-label="Source code on GitHub" />}
-                  className="inline-flex size-10 items-center justify-center rounded-md transition-colors hover:bg-muted">
-                  <GitHubIcon className="size-[18px]" />
+                  className="inline-flex size-9 items-center justify-center rounded-md transition-colors hover:bg-muted">
+                  <GitHubIcon className="size-4" />
                 </TooltipTrigger>
                 <TooltipContent>Source on GitHub</TooltipContent>
               </Tooltip>
+              <span className="mx-1 h-5 w-px bg-border" aria-hidden />
               <Tooltip>
-                <TooltipTrigger render={<span />} className="ml-1 inline-flex">
+                <TooltipTrigger render={<span />} className="inline-flex">
                   <button onClick={refresh} disabled={!status || busy || manualLeft === 0} aria-label={busy ? "Updating rates" : "Refresh rates"}
-                    className="inline-flex h-10 items-center gap-2 rounded-md bg-foreground px-3.5 text-sm font-semibold text-background transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40">
+                    className="inline-flex h-9 items-center gap-2 rounded-md bg-foreground px-3 text-sm font-semibold text-background transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40">
                     {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />}
-                    <span className="hidden sm:inline">{busy ? "Updating" : "Refresh"}</span>
+                    <span className="hidden sm:inline">Refresh</span>
                     <span className="font-mono text-xs opacity-70">{manualLeft}/{status?.manual.limit ?? 2}</span>
                   </button>
                 </TooltipTrigger>
@@ -214,7 +230,7 @@ export default function App() {
                     : `${manualLeft} of ${status?.manual.limit ?? 2} manual refreshes left this hour. Rates also update every 3 hours.`}
                 </TooltipContent>
               </Tooltip>
-            </div>
+            </nav>
           </div>
         </header>
 
@@ -235,7 +251,7 @@ export default function App() {
           <Explore status={status} currency={currency} onPick={setCurrency} now={now} />
         </main>
 
-        <Footer banks={status?.banks ?? []} canInstall={!!install} onInstall={installApp} />
+        <Footer banks={status?.banks ?? []} />
       </div>
       <Toaster theme={dark ? "dark" : "light"} position="bottom-center" />
     </TooltipProvider>
@@ -265,7 +281,7 @@ function CurrencyRail({ top, all, currency, onPick }: { top: string[]; all: stri
   )
 }
 
-function Slab({ status, history, currency, now }: { status: Status | null; history: Snapshot[]; currency: string; now: number }) {
+function Slab({ status, history, currency, now }: { status: Status | null; history: Snapshot[] | null; currency: string; now: number }) {
   const [bankId, setBankId] = useState("best")
   const [side, setSide] = useState<"buying" | "selling">("buying")
   const [range, setRange] = useState("1W")
@@ -275,14 +291,15 @@ function Slab({ status, history, currency, now }: { status: Status | null; histo
   const banks = status?.banks ?? []
   const rows = ratesFor(banks, currency)
   const top = bestOf(rows)
-  const since = Date.now() - (RANGES.find((r) => r.label === range)?.ms ?? Infinity)
-  const data = useMemo(() => seriesFrom(history, bankId, side, since), [history, bankId, side, since])
+  // Window from the 30-second clock, not Date.now(), so the data (and the chart) stay put between ticks.
+  const since = now - (RANGES.find((r) => r.label === range)?.ms ?? Infinity)
+  const data = useMemo(() => seriesFrom(history ?? [], bankId, side, since), [history, bankId, side, since])
 
   // Live value from the latest rates; a hovered chart point replaces it.
   const liveBank = bankId === "best" ? top?.[side].banks[0] : banks.find((b) => b.id === bankId)
   const liveValue = bankId === "best" ? top?.[side].value : liveBank?.rates.find((r) => r.currency === currency)?.[side]
   const point = hover != null ? data[hover] : null
-  const shownBank = point ? banks.find((b) => b.id === point.bankId) : liveBank
+  const shownBank = liveBank
   const shownValue = point?.value ?? liveValue
   const shownAt = point?.at ?? shownBank?.fetchedAt ?? status?.lastRefresh?.at
   const first = data[0]
@@ -316,8 +333,6 @@ function Slab({ status, history, currency, now }: { status: Status | null; histo
     setSharing(false)
   }
 
-  const seg = (active: boolean, pad = "px-3") => `rounded ${pad} py-1.5 text-xs font-semibold transition-colors ${active ? "bg-background text-foreground" : "text-background/70 hover:text-background"}`
-
   return (
     <section aria-label={`${currency} best rate`} className="grid grid-cols-1 overflow-hidden rounded-md bg-foreground text-background lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
       <div className="flex flex-col gap-6 p-5 sm:p-8">
@@ -331,25 +346,22 @@ function Slab({ status, history, currency, now }: { status: Status | null; histo
               {banks.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
             </SelectContent>
           </Select>
-          <div className="inline-flex rounded-md border border-background/30 p-0.5" role="group" aria-label="Rate side">
-            {(["buying", "selling"] as const).map((s) => (
-              <button key={s} onClick={() => setSide(s)} aria-pressed={side === s} className={`capitalize ${seg(side === s)}`}>{s}</button>
-            ))}
-          </div>
+          <Segmented label="Rate side" options={["Buying", "Selling"]} value={side === "buying" ? "Buying" : "Selling"}
+            onChange={(v) => setSide(v === "Buying" ? "buying" : "selling")} className="w-40" />
         </div>
 
-        {!status ? (
-          <div className="space-y-3"><Skeleton className="h-9 w-4/5 bg-background/15" /><Skeleton className="h-20 w-3/5 bg-background/15" /></div>
+        {!status || shownValue == null ? (
+          <div className="space-y-3" aria-label="Loading rates"><Skeleton className="h-9 w-4/5 bg-background/15" /><Skeleton className="h-20 w-3/5 bg-background/15" /><Skeleton className="h-4 w-2/3 bg-background/15" /></div>
         ) : (
-          <div key={`${currency}-${bankId}-${side}`} className="slab-wipe" aria-live="polite">
+          <div key={`${currency}-${bankId}-${side}`} className="switch-in" aria-live="polite">
             <h1 className="font-heading text-3xl leading-tight font-extrabold tracking-tight text-balance sm:text-[2.75rem]">{name}</h1>
             <p className="mt-4 flex items-baseline gap-2 font-mono leading-none">
               <span className="text-2xl font-medium text-background/60 sm:text-3xl">Rs</span>
-              <span className="text-6xl font-bold tracking-[-0.04em] sm:text-7xl lg:text-8xl">{whole}{decimals && <span className="text-3xl font-semibold text-background/60 sm:text-4xl">.{decimals}</span>}</span>
+              <span className="text-6xl font-bold tracking-[-0.04em] sm:text-7xl">{whole}{decimals && <span className="text-3xl font-semibold text-background/60 sm:text-4xl">.{decimals}</span>}</span>
             </p>
-            <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-background/70">
+            <p className="mt-3 flex min-w-0 flex-col gap-1 text-sm text-background/70">
               {change != null && (
-                <span className={`inline-flex items-center gap-1 font-mono font-semibold ${change === 0 ? "" : good ? "text-slab-up" : "text-slab-down"}`}>
+                <span className={`inline-flex w-fit items-center gap-1 font-mono font-semibold ${change === 0 ? "" : good ? "text-slab-up" : "text-slab-down"}`}>
                   {change > 0 ? <ArrowUp className="size-3.5" aria-hidden /> : change < 0 ? <ArrowDown className="size-3.5" aria-hidden /> : null}
                   {change >= 0 ? "+" : ""}{num(change)} ({change >= 0 ? "+" : ""}{first ? ((change / first.value) * 100).toFixed(2) : "0.00"}%) {range}
                 </span>
@@ -375,35 +387,46 @@ function Slab({ status, history, currency, now }: { status: Status | null; histo
       </div>
 
       <div className="flex flex-col gap-4 border-t border-background/15 p-5 sm:p-8 lg:border-t-0 lg:border-l">
-        <div className="min-h-56 flex-1 sm:min-h-72">
-          {data.length < 2 ? (
-            <div className="flex h-full min-h-56 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-background/25 px-6 text-center text-sm text-background/70 sm:min-h-72">
+        {/* Fixed height: the chart never resizes when the text beside it changes. */}
+        <div className="h-64 sm:h-80">
+          {history === null ? (
+            <Skeleton className="h-full w-full bg-background/10" />
+          ) : data.length < 2 ? (
+            <div className="switch-in flex h-full flex-col items-center justify-center gap-1 rounded-md border border-dashed border-background/25 px-6 text-center text-sm text-background/70">
               <p className="font-medium text-background">The history line starts here.</p>
               <p>A point is added every 3 hours. {data.length === 1 ? "One so far in this range." : "None in this range yet."}</p>
             </div>
           ) : (
-            <ChartContainer config={{ value: { label: side, color: "var(--background)" } }}
-              className="aspect-auto h-full min-h-56 w-full sm:min-h-72 [&_.recharts-cartesian-axis-tick_text]:fill-background/60">
+            <ChartContainer key={`${currency}-${bankId}-${side}-${range}`} config={{ value: { label: side, color: "var(--background)" } }}
+              className="switch-in aspect-auto h-full w-full [&_.recharts-cartesian-axis-tick_text]:fill-background/60">
               <LineChart data={data} margin={{ top: 8, right: 4, bottom: 8, left: 4 }}
                 onMouseMove={(s) => setHover(s?.activeTooltipIndex != null ? Number(s.activeTooltipIndex) : null)}
                 onMouseLeave={() => setHover(null)}>
                 <YAxis orientation="right" ticks={[Math.min(...values), Math.max(...values)]}
-                  domain={[(min: number) => min - (Math.max(...values) - min) * 0.08 - 0.01, (max: number) => max + (max - Math.min(...values)) * 0.08 + 0.01]}
+                  domain={[Math.min(...values) - (Math.max(...values) - Math.min(...values)) * 0.08 - 0.01, Math.max(...values) + (Math.max(...values) - Math.min(...values)) * 0.08 + 0.01]}
                   tickFormatter={(v: number) => num(v)} axisLine={false} tickLine={false} width={64}
                   tick={{ fontFamily: "var(--font-mono)", fontSize: 11 }} />
-                <ChartTooltip cursor={{ stroke: "var(--background)", strokeOpacity: 0.5, strokeWidth: 1 }} content={() => null} />
+                <ChartTooltip cursor={{ stroke: "var(--background)", strokeOpacity: 0.5, strokeWidth: 1 }}
+                  isAnimationActive={false} offset={14} wrapperStyle={{ outline: "none" }}
+                  content={({ active, payload }) => {
+                    const p = active ? (payload?.[0]?.payload as (typeof data)[number] | undefined) : undefined
+                    if (!p) return null
+                    const b = banks.find((x) => x.id === p.bankId)
+                    return (
+                      <div className="rounded-md bg-background px-2.5 py-1.5 text-foreground">
+                        <div className="font-mono text-sm font-bold">Rs {num(p.value)}</div>
+                        <div className="text-[11px] text-muted-foreground">{clock(p.at)}{b ? ` · ${shortName(b)}` : ""}</div>
+                      </div>
+                    )
+                  }} />
                 <Line dataKey="value" type="monotone" stroke="var(--background)" strokeWidth={2.5} dot={false}
                   activeDot={{ r: 5, fill: "var(--background)", stroke: "var(--foreground)", strokeWidth: 2 }} isAnimationActive={false} />
               </LineChart>
             </ChartContainer>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex flex-1 items-center gap-1 rounded-md border border-background/30 p-0.5" role="group" aria-label="Chart range">
-            {RANGES.map((r) => (
-              <button key={r.label} onClick={() => setRange(r.label)} aria-pressed={range === r.label} className={`flex-1 font-mono ${seg(range === r.label, "px-0 sm:px-3")}`}>{r.label}</button>
-            ))}
-          </div>
+        <div className="mt-auto flex items-center gap-2">
+          <Segmented label="Chart range" options={RANGES.map((r) => r.label)} value={range} onChange={setRange} className="flex-1" mono />
           <button onClick={share} disabled={shownValue == null || sharing}
             className="inline-flex h-9 items-center gap-2 rounded-md bg-background px-3.5 text-sm font-semibold text-foreground transition-opacity hover:opacity-85 disabled:opacity-40">
             {sharing ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Share2 className="size-4" aria-hidden />}
@@ -412,6 +435,26 @@ function Slab({ status, history, currency, now }: { status: Status | null; histo
         </div>
       </div>
     </section>
+  )
+}
+
+// One toggle style for every switch on the slab: equal segments and a sliding indicator on the shared ease.
+function Segmented({ label, options, value, onChange, className = "", mono = false }: {
+  label: string; options: string[]; value: string; onChange: (v: string) => void; className?: string; mono?: boolean
+}) {
+  const i = Math.max(0, options.indexOf(value))
+  return (
+    <div role="group" aria-label={label} className={`relative grid rounded-md border border-background/30 p-0.5 ${className}`}
+      style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
+      <span aria-hidden className="ease-out-expo absolute top-0.5 bottom-0.5 left-0.5 rounded bg-background transition-transform duration-300"
+        style={{ width: `calc((100% - 4px) / ${options.length})`, transform: `translateX(${i * 100}%)` }} />
+      {options.map((o) => (
+        <button key={o} onClick={() => onChange(o)} aria-pressed={o === value}
+          className={`relative z-10 py-1.5 text-xs font-semibold transition-colors duration-300 ${mono ? "font-mono" : ""} ${o === value ? "text-foreground" : "text-background/70 hover:text-background"}`}>
+          {o}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -445,7 +488,7 @@ function TopCurrencies({ status, codes, currency, onPick }: { status: Status | n
     <section aria-label="Top currencies">
       <SectionHead title="Top currencies" hint="The bank paying the most and charging the least for each. Tap one to show it at the top." />
       <div className="grid lg:grid-cols-2 lg:gap-x-10">
-        {!status
+        {!status || !codes.length
           ? Array.from({ length: 10 }, (_, i) => <Skeleton key={i} className="my-2 h-12" />)
           : codes.map((code) => {
               const top = bestOf(ratesFor(banks, code))
@@ -512,7 +555,7 @@ function Explore({ status, currency, onPick, now }: { status: Status | null; cur
           <p className="mt-1">Try a bank like “Seylan” or a currency like “AUD” or “yen”.</p>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div key={q} className="switch-in space-y-8">
           {codeHits.length > 0 && (
             <Table>
               <TableHeader className="[&_tr]:border-b-2 [&_tr]:border-foreground">
@@ -564,7 +607,7 @@ function CompareTable({ status, currency }: { status: Status | null; currency: s
   const top = bestOf(rows)
   if (!status) return <div className="space-y-3">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
   return (
-    <Table>
+    <Table key={currency} className="switch-in">
       <TableHeader className="[&_tr]:border-b-2 [&_tr]:border-foreground">
         <TableRow>
           <TableHead>Bank</TableHead>
@@ -591,7 +634,9 @@ function CompareTable({ status, currency }: { status: Status | null; currency: s
                 <TableCell className="hidden text-right font-mono text-muted-foreground md:table-cell">{num(rate.selling - rate.buying)}</TableCell>
               </>
             ) : (
-              <TableCell colSpan={3} className="text-right text-muted-foreground">{bank.fetchedAt || bank.error ? "Not offered" : "Loading…"}</TableCell>
+              bank.fetchedAt || bank.error
+                ? <TableCell colSpan={3} className="text-right text-muted-foreground">Not offered</TableCell>
+                : <TableCell colSpan={3}><Skeleton className="ml-auto h-4 w-40" /></TableCell>
             )}
             <TableCell className="hidden text-muted-foreground sm:table-cell">{bankClock(bank.bankUpdatedAt)}</TableCell>
           </TableRow>
@@ -617,7 +662,8 @@ function BankSheet({ bank, now }: { bank: Bank; now: number }) {
         </a>
       </div>
       {bank.rates.length === 0 ? (
-        <p className="py-4 text-sm text-muted-foreground">{bank.error ?? "Loading…"}</p>
+        bank.error ? <p className="py-4 text-sm text-muted-foreground">{bank.error}</p>
+          : <div className="space-y-2 py-4">{Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-6 w-full" />)}</div>
       ) : (
         <Table>
           <TableHeader className="[&_tr]:border-b-2 [&_tr]:border-foreground">
@@ -642,59 +688,45 @@ function BankSheet({ bank, now }: { bank: Bank; now: number }) {
   )
 }
 
-function Footer({ banks, canInstall, onInstall }: { banks: Bank[]; canInstall: boolean; onInstall: () => void }) {
+function Footer({ banks }: { banks: Bank[] }) {
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !(navigator as Navigator & { standalone?: boolean }).standalone
+  const link = "text-muted-foreground transition-colors hover:text-foreground"
   return (
-    <footer className="mt-16 bg-foreground text-background">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.5fr_1fr_1fr]">
-        <div className="space-y-4">
-          <div className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="" width={32} height={32} className="size-8" />
-            <span className="font-heading text-xl font-bold tracking-tight">LKR Rates</span>
+    <footer className="mt-20 border-t-2 border-foreground">
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
+        <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <div className="max-w-md space-y-2">
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="" width={24} height={24} className="size-6" />
+              <span className="font-heading font-bold tracking-tight">LKR Rates</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Telegraphic transfer rates from {banks.length || 9} Sri Lankan banks, read from their own websites every 3 hours.
+              {ios && " On iPhone, tap Share then “Add to Home Screen” to install."}
+            </p>
           </div>
-          <p className="max-w-sm text-sm leading-relaxed text-background/70">
-            Which Sri Lankan bank pays the most for your money today. Telegraphic transfer rates from {banks.length || 9} banks, read from their own websites every 3 hours.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {canInstall && (
-              <button onClick={onInstall} className="inline-flex h-9 items-center gap-2 rounded-md bg-background px-3.5 text-sm font-semibold text-foreground hover:opacity-85">
-                <Download className="size-4" aria-hidden /> Install app
-              </button>
-            )}
-            <a href={REPO} target="_blank" rel="noreferrer"
-              className="inline-flex h-9 items-center gap-2 rounded-md border border-background/30 px-3.5 text-sm font-semibold hover:bg-background/10">
-              <GitHubIcon className="size-4" /> Star on GitHub
-            </a>
-          </div>
-          {ios && <p className="text-xs text-background/60">On iPhone: tap Share, then “Add to Home Screen” to install.</p>}
+          <nav aria-label="Project" className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+            <a href={REPO} target="_blank" rel="noreferrer" className={`inline-flex items-center gap-1.5 ${link}`}><GitHubIcon className="size-3.5" /> GitHub</a>
+            <a href={`${REPO}#api`} target="_blank" rel="noreferrer" className={link}>API</a>
+            <a href={`${REPO}#telegram-bot`} target="_blank" rel="noreferrer" className={link}>Telegram bot</a>
+            <a href={`${REPO}/issues`} target="_blank" rel="noreferrer" className={link}>Report an issue</a>
+            <a href={`${REPO}/blob/main/LICENSE`} target="_blank" rel="noreferrer" className={link}>MIT License</a>
+          </nav>
         </div>
-        <nav aria-label="Bank sources">
-          <h3 className="mb-3 text-sm font-semibold">Sources</h3>
-          <ul className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm md:grid-cols-1">
-            {banks.map((b) => (
-              <li key={b.id}><a href={b.url} target="_blank" rel="noreferrer" className="text-background/70 hover:text-background hover:underline">{b.name}</a></li>
-            ))}
-          </ul>
-        </nav>
-        <nav aria-label="Project">
-          <h3 className="mb-3 text-sm font-semibold">Project</h3>
-          <ul className="space-y-2 text-sm">
-            <li><a href={REPO} target="_blank" rel="noreferrer" className="text-background/70 hover:text-background hover:underline">Source code</a></li>
-            <li><a href={`${REPO}#api`} target="_blank" rel="noreferrer" className="text-background/70 hover:text-background hover:underline">API and Telegram bot</a></li>
-            <li><a href={`${REPO}/issues`} target="_blank" rel="noreferrer" className="text-background/70 hover:text-background hover:underline">Report an issue</a></li>
-            <li><a href={`${REPO}/blob/main/LICENSE`} target="_blank" rel="noreferrer" className="text-background/70 hover:text-background hover:underline">MIT License</a></li>
-          </ul>
-        </nav>
-      </div>
-      <div className="border-t border-background/15">
-        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-5 text-xs text-background/60 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          <span className="font-medium text-foreground">Sources: </span>
+          {banks.map((b, i) => (
+            <span key={b.id}>{i > 0 && " · "}<a href={b.url} target="_blank" rel="noreferrer" className="hover:text-foreground hover:underline">{b.name}</a></span>
+          ))}
+        </p>
+        <div className="flex flex-col gap-1 border-t pt-4 text-xs text-muted-foreground sm:flex-row sm:justify-between">
           <p>
-            © {new Date().getFullYear()} Built by{" "}
-            <a href="https://github.com/harindujayakody" target="_blank" rel="noreferrer" className="font-semibold text-background hover:underline">Harindu Jayakody</a>
+            © {new Date().getFullYear()}{" "}
+            <a href="https://github.com/harindujayakody" target="_blank" rel="noreferrer" className="font-medium text-foreground hover:underline">Harindu Jayakody</a>
             {" · "}
-            <a href={REPO} target="_blank" rel="noreferrer" className="hover:text-background hover:underline">exchnage-rates-srilanka</a>
+            <a href={REPO} target="_blank" rel="noreferrer" className="hover:text-foreground hover:underline">exchnage-rates-srilanka</a>
           </p>
-          <p>Indicative rates from public bank websites. Confirm with your bank before you transact.</p>
+          <p>Indicative rates. Confirm with your bank before you transact.</p>
         </div>
       </div>
     </footer>

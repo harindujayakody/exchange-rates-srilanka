@@ -32,7 +32,7 @@ typography:
     letterSpacing: "-0.025em"
   rate:
     fontFamily: "JetBrains Mono Variable, ui-monospace, monospace"
-    fontSize: "6rem"
+    fontSize: "4.5rem"
     fontWeight: 700
     lineHeight: 1
     letterSpacing: "-0.04em"
@@ -176,7 +176,7 @@ The world explicitly refuses the category default: a soft dark fintech dashboard
 A strict two-ink system, paper and ink, with a single pair of movement colours that swap with the theme.
 
 ### Primary
-- **Ink** (#0a0a0a): text, 2px structural rules, the primary button, the active currency chip, the best-value chip, tooltips, and the slab and footer field on the light theme. In the dark theme it becomes the page ground.
+- **Ink** (#0a0a0a): text, 2px structural rules, the primary button, the active currency chip, the best-value chip, tooltips, and the slab field on the light theme. In the dark theme it becomes the page ground.
 - **Paper** (#ffffff): the light theme ground and the text on every inverted surface. In the dark theme, **Snow** (#fafafa) takes its place as text, rules and slab field.
 
 ### Secondary
@@ -209,7 +209,7 @@ A strict two-ink system, paper and ink, with a single pair of movement colours t
 
 ### Hierarchy
 - **Display** (Poppins 800, 1.875rem mobile to 2.75rem from 640px, line-height 1.25, -0.025em, balanced wrap): the bank name in the slab, and only that. The headline is the bank name alone, no sentence around it.
-- **Rate** (JetBrains Mono 700, 3.75rem mobile, 4.5rem from 640px, 6rem from 1024px, line-height 1, -0.04em): the slab's whole-number rate. The "Rs" prefix (500, 1.5-1.875rem) sits beside it with an 8px gap; the decimals (600, 1.875-2.25rem) are attached to the whole number with no gap, both at 60% opacity on one baseline.
+- **Rate** (JetBrains Mono 700, 3.75rem mobile, 4.5rem from 640px (kept there so 4-digit rates like KWD fit the slab column), line-height 1, -0.04em): the slab's whole-number rate. The "Rs" prefix (500, 1.5-1.875rem) sits beside it with an 8px gap; the decimals (600, 1.875-2.25rem) are attached to the whole number with no gap, both at 60% opacity on one baseline.
 - **Headline** (Poppins 700, 1.5rem, -0.025em): section heads ("Top currencies", "USD at every bank", "Search results").
 - **Title** (Poppins 700, 1.25rem wordmark, 1.125rem bank sheet heading): the "LKR Rates" wordmark and bank names over per-bank tables.
 - **Body** (Inter 400, 0.875rem, line-height 1.43): hints, table text, slab meta lines, footer copy (relaxed 1.625 leading, max ~24rem).
@@ -228,13 +228,13 @@ A single centred column, max width 72rem (1152px), with 16px side padding on mob
 
 The slab is one column on mobile and splits 5:7 from 1024px (figures left, history chart right, divided by a paper-at-15% rule). Slab padding is 20px mobile, 32px from 640px, with 24px between its blocks. Top currencies is a ruled list that becomes two columns from 1024px with a 40px gutter; bank search results become two columns from 768px. The currency rail scrolls horizontally, bleeding to the screen edge on mobile with its scrollbar hidden.
 
-Tables shed columns as width drops: Spread hides below 768px, Bank updated and bank logos below 640px. The ink footer runs full width at the bottom with a 1.5fr/1fr/1fr grid from 768px.
+Tables shed columns as width drops: Spread hides below 768px, Bank updated and bank logos below 640px. The footer sits on the page ground under a 2px ink rule: brand line and links side by side from 768px, stacked below.
 
 Spacing rhythm is 4px-based: 4 and 8px inside controls, 12px row padding, 16px between related blocks, 24-32px inside the slab, 40px between sections.
 
 ## Elevation & Depth
 
-The system is flat. There are no shadows, gradients, glows or translucent glass on any page surface. Depth and hierarchy come from three things only: inversion (the slab, active chips and rows, best-value chips, tooltips and the footer are ink fields on paper, or snow on ink in dark), rule weight (2px ink for structure, 1px hairline for rows), and type weight.
+The system is flat. There are no shadows, gradients, glows or translucent glass on any page surface. Depth and hierarchy come from three things only: inversion (the slab, active chips and rows, best-value chips and tooltips are ink fields on paper, or snow on ink in dark), rule weight (2px ink for structure, 1px hairline for rows), and type weight.
 
 ### Named Rules
 **The Flat Ink Rule.** If something needs to stand forward, invert it or rule it. Never lift it with a shadow.
@@ -251,7 +251,8 @@ Rules are the main shape language: 2px ink under the header, under every section
 Solid, square-shouldered, and inverted rather than coloured.
 - **Shape:** tight corners (4px), 40px tall in the header, 36px elsewhere, 14px horizontal padding, Inter 600 at 0.875rem with a 16px icon.
 - **Primary (Refresh):** ink field, paper text, with the remaining manual-refresh count in mono at 70% opacity ("2/2"). The label hides below 640px; the icon and count stay.
-- **On-slab / on-footer (Share, Install app):** paper field, ink text, the inversion of primary.
+- **On-slab (Share):** paper field, ink text, the inversion of primary.
+- **Segmented (Buying/Selling, chart range):** equal segments in a 1px paper-at-30% frame; the active segment is a paper indicator that slides to it over 300ms on the shared ease, its label turning ink.
 - **Outline on ink (Star on GitHub):** transparent with a 1px paper-at-30% outline; hover fills paper at 10%.
 - **Icon buttons (theme, GitHub):** 40px square, no fill at rest, wash fill on hover, 18px icons, each with a tooltip and an aria-label.
 - **Hover / Focus / Disabled:** filled buttons fade to 85% opacity on hover; disabled drops to 40% with a not-allowed cursor; busy swaps the icon for a spinning loader and the label to "Updating". Focus is a global 2px ring-colour outline offset 2px.
@@ -282,8 +283,9 @@ The answer as one solid block: ink on the light theme, snow on the dark.
 - **Focus:** the global 2px ring outline, offset 2px.
 
 ### Navigation
-- **Header:** sticky, paper ground, 2px ink bottom rule; logo (32px) and "LKR Rates" in Poppins 700 at 1.25rem left; theme, GitHub and Refresh right.
-- **Footer:** a full-width ink field (snow in dark) holding the wordmark, product line, Install and GitHub buttons, Sources and Project link columns (paper at 70%, full paper and underline on hover), and a bottom bar over a paper-at-15% rule with the builder credit and the indicative-rates disclaimer.
+- **Header:** sticky, opaque paper ground (no blur), 2px ink bottom rule, 64px tall. Left: logo (28px) and "LKR Rates" in Poppins 700 at 1.125rem, a 1px divider, then a status line from 768px ("Updated 12 minutes ago / 9 banks", a 6px ink dot that pulses while updating). Right: Install (when offered), theme and GitHub as 36px ghost icon buttons, a 1px divider, and the primary Refresh button with its manual count.
+- **Footer:** minimal, on the page ground under a 2px ink rule. A wordmark and one-sentence product line; a single row of links (GitHub, API, Telegram bot, Report an issue, MIT License) in graphite turning ink on hover; one line of bank sources; then, over a 1px hairline, the © credit and the indicative-rates disclaimer.
+- **Chart hover label:** a paper chip inside the slab (ink text, 4px corners) that follows the cursor: the rate in JetBrains Mono 700 and, under it, the date and bank in graphite. It is not animated, and the chart keeps a fixed height so nothing beside it moves while hovering.
 
 ### Share card
 A 1080 x 1350 PNG drawn on canvas, always on the dark palette regardless of theme: #0a0a0a ground, #fafafa ink, #a6a6a6 secondary, 80px margins. Order: logo and wordmark with the Colombo-time timestamp, a 3px ink rule, "USD → LKR" in mono 700 with the currency name, the bank name in Poppins 800 at up to 72px (shrinks to fit), the meaning, "Rs" plus the rate in mono 700 at up to 150px (shrinks to fit), the change line in #4ade80 / #ff7b6b, a 5px history line, the top five banks with mono buying and selling columns, then a 3px rule, the disclaimer and the host. It goes to the system share sheet or downloads.
@@ -296,7 +298,12 @@ A 1080 x 1350 PNG drawn on canvas, always on the dark palette regardless of them
 - **Toasts:** bottom-centre, theme-matched, for refresh progress, share saves and install.
 
 ### Motion
-One authored motion: the **slab wipe**. When the currency, bank or side changes, the slab's figures fade and rise in over 420ms (`cubic-bezier(0.16, 1, 0.3, 1)`) from 35% opacity and 6px down. It starts visible so the figures are readable if the animation never runs, and it is removed under `prefers-reduced-motion`. Everything else is colour or opacity transitions on hover.
+One motion vocabulary on one ease, `--ease-out-expo` (`cubic-bezier(0.16, 1, 0.3, 1)`):
+- **Switch-in** (`.switch-in`): content that changes because the visitor switched something fades and rises in over 420ms from 35% opacity and 6px down: the slab figures, the chart (per currency, bank, side and range), the comparison table (per currency), search results and the theme icon. It starts visible, so content is readable if the animation never runs.
+- **Slide:** segmented indicators move over 300ms.
+- **Theme:** switching theme cross-fades the page over 300ms with the View Transitions API where supported.
+- **Loading:** skeleton bars (wash, pulsing) stand in for the slab figures, the chart, table rows and bank sheets while their data is still being fetched.
+All of it is removed under `prefers-reduced-motion`. Hover is colour or opacity only.
 
 ## Do's and Don'ts
 

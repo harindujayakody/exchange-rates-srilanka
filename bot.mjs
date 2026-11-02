@@ -189,6 +189,28 @@ export const views = {
   },
 };
 
+// Data for the share image (web/src/card.js): best buying bank, its rate, the last week's best-rate line.
+export function cardData(banks, history, code, now = Date.now()) {
+  const b = best(banks, code);
+  if (!b) return null;
+  const series = history
+    .filter(h => now - new Date(h.at).getTime() < 7 * 86_400_000)
+    .flatMap(h => {
+      const v = Object.values(h.rates).map(r => r[code]?.[0]).filter(x => x > 0);
+      return v.length ? [Math.max(...v)] : [];
+    });
+  const first = series[0];
+  const abs = first ? b.buy.buying - first : 0;
+  return {
+    currency: code, currencyName: currencyName(code), bank: b.buy.bank.name, meaning: 'Highest buying rate',
+    value: b.buy.buying,
+    change: series.length > 1 ? { abs, pct: (abs / first) * 100, good: abs >= 0, range: '1W' } : undefined,
+    series,
+    rows: [...b.offers].sort((x, y) => y.buying - x.buying).map(o => ({ name: o.bank.name, buying: o.buying, selling: o.selling })),
+    at: b.offers.map(o => o.bank.fetchedAt).filter(Boolean).sort().at(-1) ?? new Date(now).toISOString(),
+  };
+}
+
 // Free text: a currency code or name ("usd", "yen", "dollar"), or a bank ("seylan", "boc").
 export function resolve(text, banks) {
   const q = text.trim().replace(/^\/(rate|bank)\s*/i, '').toLowerCase();
@@ -204,7 +226,7 @@ export function resolve(text, banks) {
   return null;
 }
 
-export function createBot({ token, admins = [], getBanks, refreshBank, getUsage, log = console }) {
+export function createBot({ token, admins = [], getBanks, refreshBank, getUsage, getHistory = () => [], renderCard = null, host = '', log = console }) {
   const call = async (method, body) => {
     const res = await fetch(`${API}${token}/${method}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -219,6 +241,34 @@ export function createBot({ token, admins = [], getBanks, refreshBank, getUsage,
   const show = (chatId, messageId, view) => (messageId
     ? call('editMessageText', { chat_id: chatId, message_id: messageId, parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...view })
     : call('sendMessage', { chat_id: chatId, parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...view }));
+
+  // A currency answer is the share image with the rate table as its caption. Telegram's file_id is cached per
+  // set of rates, so asking again re-sends the stored photo instead of drawing and uploading it again.
+  const photoIds = new Map();
+  async function showCurrency(chatId, code) {
+    const banks = getBanks();
+    const view = views.currency(banks, code);
+    const card = renderCard && cardData(banks, getHistory(), code);
+    if (!card) return show(chatId, null, view);
+    const key = `${code}|${card.at}|${card.series.length}`;
+    const caption = view.text.length <= 1024 ? view.text : view.text.split('\n\n')[0]; // Telegram's caption limit
+    const form = new FormData();
+    form.append('chat_id', String(chatId));
+    form.append('caption', caption);
+    form.append('parse_mode', 'HTML');
+    form.append('reply_markup', JSON.stringify(view.reply_markup));
+    if (photoIds.has(key)) form.append('photo', photoIds.get(key));
+    else form.append('photo', new Blob([await renderCard(card, host)], { type: 'image/png' }), `lkr-rates-${code.toLowerCase()}.png`);
+    const res = await fetch(`${API}${token}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(60_000) });
+    const json = await res.json();
+    if (!json.ok) {
+      log.error('telegram sendPhoto:', json.description);
+      return show(chatId, null, view); // fall back to the text answer
+    }
+    photoIds.set(key, json.result.photo.at(-1).file_id);
+    if (photoIds.size > 200) photoIds.delete(photoIds.keys().next().value);
+    if (caption !== view.text) await show(chatId, null, { text: view.text, reply_markup: view.reply_markup });
+  }
 
   function viewFor(data, userId) {
     const banks = getBanks();
@@ -235,7 +285,8 @@ export function createBot({ token, admins = [], getBanks, refreshBank, getUsage,
   }
 
   async function onCallback(q) {
-    const chatId = q.message.chat.id, messageId = q.message.message_id;
+    // A photo's caption can't be edited into a text view, so taps on a photo answer with a new message.
+    const chatId = q.message.chat.id, messageId = q.message.photo ? null : q.message.message_id;
     if (q.data.startsWith('r:')) {
       const id = q.data.slice(2);
       const bank = getBanks().find(b => b.id === id);
@@ -253,6 +304,7 @@ export function createBot({ token, admins = [], getBanks, refreshBank, getUsage,
       return;
     }
     await call('answerCallbackQuery', { callback_query_id: q.id });
+    if (q.data.startsWith('c:')) return showCurrency(chatId, q.data.slice(2));
     await show(chatId, messageId, viewFor(q.data, q.from.id));
   }
 
@@ -267,7 +319,7 @@ export function createBot({ token, admins = [], getBanks, refreshBank, getUsage,
     if (/^\/banks\b/.test(text)) return show(chatId, null, views.banks(getBanks()));
     const banks = getBanks();
     const hit = resolve(text, banks);
-    if (hit?.type === 'currency') return show(chatId, null, views.currency(banks, hit.code));
+    if (hit?.type === 'currency') return showCurrency(chatId, hit.code);
     if (hit?.type === 'bank') return show(chatId, null, views.bank(hit.bank));
     if (hit?.type === 'pick') {
       return show(chatId, null, { text: 'Which one?', reply_markup: { inline_keyboard: rowsOf(hit.codes.map(c => btn(`${flag(c)} ${c} · ${currencyName(c)}`, `c:${c}`)), 2) } });

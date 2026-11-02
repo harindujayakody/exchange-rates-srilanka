@@ -2,6 +2,23 @@
 
 All notable changes to LKR Rates. Dates are in Sri Lanka time.
 
+## 1.3.0 — 2026-11-02
+
+### Added
+- **The bot replies with the share image.** Asking for a currency sends the rate card with the comparison table as its caption. The card is drawn by the same `web/src/card.js` as the web page, using `@napi-rs/canvas` (optional; without it the bot sends text). Telegram's file id is cached per set of rates, so repeat requests don't redraw or re-upload.
+- **Chart hover label:** an inverted chip with the rate, date and bank follows the cursor.
+- **Skeleton loading** for the slab figures, the chart, table rows and bank sheets while their data is still being fetched.
+- `PUBLIC_URL` setting, shown on the bot's share images.
+
+### Changed
+- **Header redesign:** smaller wordmark, a live status line ("Updated 12 minutes ago / 9 banks"), compact icon buttons and the Refresh button, on an opaque ground with no blur.
+- **Footer redesign:** minimal, on the page background: a product line, one row of links, the bank sources and the credit.
+- **One motion for every switch:** toggles share a sliding indicator, switched content fades and rises in on the same ease, and the theme cross-fades.
+
+### Fixed
+- The chart no longer shakes on hover. It now has a fixed height, its time window no longer changes on every render, and the tooltip no longer animates.
+- Four-digit rates such as KWD fit the slab on desktop again.
+
 ## 1.2.0 — 2026-11-02
 
 ### Added

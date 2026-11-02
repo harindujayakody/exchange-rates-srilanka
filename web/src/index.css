@@ -59,6 +59,7 @@
 }
 
 :root {
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
     /* Bold monochrome: pure white ground, near-black ink. Colour only marks movement. */
     --up: #0b7a3b;
     --down: #c42b1c;
@@ -168,16 +169,25 @@
   a {
     text-underline-offset: 3px;
     }
-  /* Starts visible: if the animation never runs, the figures are still readable. */
-  @keyframes slab-wipe {
+  /* One motion for every switch (currency, side, range, theme icon, search results):
+     a short fade-and-rise on one ease. Starts visible, so nothing is hidden if it never runs. */
+  @keyframes switch-in {
     from { opacity: 0.35; transform: translateY(6px); }
     to { opacity: 1; transform: none; }
     }
-  .slab-wipe {
-    animation: slab-wipe 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  .switch-in {
+    animation: switch-in 420ms var(--ease-out-expo);
+    }
+  .ease-out-expo {
+    transition-timing-function: var(--ease-out-expo);
+    }
+  ::view-transition-old(root), ::view-transition-new(root) {
+    animation-duration: 300ms;
+    animation-timing-function: var(--ease-out-expo);
     }
   @media (prefers-reduced-motion: reduce) {
-    .slab-wipe { animation: none; }
+    .switch-in { animation: none; }
+    .ease-out-expo { transition-duration: 0ms; }
     }
   h1, h2, h3 {
     @apply font-heading;

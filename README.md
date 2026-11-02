@@ -36,7 +36,7 @@ Sending money home or selling dollars in Sri Lanka means opening nine bank websi
 - **Flags** in front of every currency, from inline SVGs.
 - **Share like an exchange app.** One tap makes a 1080×1350 rate card and opens your phone's share sheet for WhatsApp, Telegram, Instagram and others. On desktop it saves the PNG.
 - **Install it as an app** on Windows, macOS, Android or iPhone. The last rates stay readable offline.
-- **Telegram bot** with currency and bank menus, best rates today, and per-bank refresh on request. Admins also see token usage for today and all time.
+- **Telegram bot** that answers a currency with the share image, plus bank menus, best rates today, and per-bank refresh on request. Admins also see token usage for today and all time.
 - **API for agents** such as Hermes, with an OpenAPI description and optional bearer tokens.
 - **One time standard.** Every bank writes dates its own way (`02.11.2026 11:30 AM`, `Monday, November 02 2026`, `02 Nov 2026 - 10:56AM`…). They are all converted to ISO in Sri Lanka time.
 - **Runs on free AI.** A free OpenRouter model copies each rate table, so the API cost is $0.
@@ -66,6 +66,7 @@ The model only transcribes, which it does reliably, and the code does the reason
 git clone https://github.com/harindujayakody/exchnage-rates-srilanka.git
 cd exchnage-rates-srilanka
 cp .env.example .env          # then paste your OpenRouter key
+npm install                   # optional: lets the Telegram bot send rate images
 npm run build                 # builds the web UI
 npm run dev                   # http://localhost:3000
 ```
@@ -91,9 +92,11 @@ Open the site in Chrome or Edge (Windows, macOS, Android) and choose **Install a
 | `/start` | Main menu: Currencies, Banks, Best today, About (and Usage for admins) |
 | `/best` | Best buying and selling bank for each top currency |
 | `/currencies`, `/banks` | Pick from a menu |
-| `usd`, `yen`, `dollar` | That currency at every bank, best first |
+| `usd`, `yen`, `dollar` | The rate image for that currency, with every bank in the caption |
 | `seylan`, `boc` | Every rate that bank publishes, with a Refresh button |
 | `/usage` | Admin only: requests, tokens and cost for today and all time |
+
+Rate images need the optional `@napi-rs/canvas` package (`npm install` in the project root installs it; without it the bot sends text). Set `PUBLIC_URL` to print your site address on them.
 
 The bot reads the saved rates, so browsing costs no tokens. **Refresh** fetches only that one bank, and only when its data is more than 10 minutes old.
 
@@ -153,6 +156,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://your-host/rates?currency=USD"
 | `TELEGRAM_BOT_TOKEN` | off | Starts the Telegram bot |
 | `TELEGRAM_ADMIN_IDS` | none | Telegram user ids that can see usage |
 | `API_TOKENS` | open | Comma-separated bearer tokens for the data API |
+| `PUBLIC_URL` | none | Your site address, printed on the bot's share images |
 
 ## Add a bank
 
@@ -167,13 +171,15 @@ HNB and Pan Asia aren't included yet. Their pages only show rates after running 
 ```
 server.mjs        API, scheduler, AI extraction, security (no dependencies)
 bot.mjs           Telegram bot (no dependencies)
+cardimage.mjs     draws the share image in Node for the bot (optional @napi-rs/canvas)
 test.mjs          checks for parsing, dates, limits, usage, tokens, bot (npm test)
 PRODUCT.md        who it is for and what it must do
 DESIGN.md         the design system
 CHANGELOG.md      release notes
 web/              React + Vite + shadcn/ui dashboard
 web/public/logos  bank logos
-web/src/share.ts  the share image
+web/src/card.js   the share image, drawn the same way in the browser and the bot
+web/src/share.ts  sharing it from the web page
 web/src/assets/flags  currency flags (country-flag-icons, MIT)
 data/             runtime state and history (git-ignored)
 ```
