@@ -1,0 +1,11 @@
+# Secrets and runtime data never go into the image
+.env
+.env.*
+data/
+
+node_modules/
+web/node_modules/
+web/dist/
+.git/
+.impeccable/
+*.log

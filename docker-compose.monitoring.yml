@@ -1,0 +1,16 @@
+# Dozzle: a live log viewer for the containers on this Docker host.
+#   docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+# then open http://localhost:8080
+#
+# Dozzle can read every container's logs, so it only listens on this machine (127.0.0.1).
+# To reach it from elsewhere, put it behind a password first (Dozzle "simple" auth, or Coolify's own domain + basic auth).
+services:
+  dozzle:
+    image: amir20/dozzle:v8
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      DOZZLE_NO_ANALYTICS: "true"

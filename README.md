@@ -78,6 +78,38 @@ Get a free key at [openrouter.ai/keys](https://openrouter.ai/keys). On a host th
 
 Open the site in Chrome or Edge (Windows, macOS, Android) and choose **Install app** in the footer or the address bar. On iPhone, tap **Share**, then **Add to Home Screen**. Installing needs HTTPS (or `localhost`).
 
+## Run with Docker
+
+```bash
+cp .env.example .env              # add your keys
+docker compose up -d --build      # http://localhost:3000
+docker compose logs -f app        # one line per refresh: banks ok, AI requests, failures
+```
+
+The image builds the web app, includes the optional image library for the bot, runs as a non-root user, and keeps rates, history, usage and bot subscribers in the `lkr-data` volume (`/data`). Docker checks `GET /healthz` every minute. It reports unhealthy only when the rates have gone stale (no refresh for two intervals) or every bank failed.
+
+**Run only one copy with the same Telegram token.** Two copies fight over Telegram updates ("Conflict: terminated by other getUpdates request") and the bot stops answering reliably.
+
+### Watch the logs with Dozzle
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d   # http://localhost:8080
+```
+
+[Dozzle](https://dozzle.dev) shows live logs for every container on the host. It can read all of them, so it listens on `127.0.0.1` only. Put it behind a password before exposing it anywhere.
+
+### Deploy on Coolify
+
+[Coolify](https://coolify.io) is a self-hosted Heroku/Vercel alternative for your own Linux server (Ubuntu VPS with 2 GB RAM or more):
+
+1. On the server, as root: `curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash`, then open `http://<server-ip>:8000` and create the admin account.
+2. **New Resource → Public repository** (or connect GitHub) → `https://github.com/harindujayakody/exchange-rates-srilanka`, branch `main`.
+3. Build pack: **Docker Compose** (uses `docker-compose.yml`). Coolify keeps the `lkr-data` volume across deploys.
+4. **Environment variables:** `OPENROUTER_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ADMIN_IDS`, `TRUST_PROXY=1`, and `PUBLIC_URL` once you have a domain.
+5. **Domain:** add one for the `app` service on port 3000. Coolify issues HTTPS, which the installable app needs.
+6. **Health check:** path `/healthz`, port 3000. Turn on Coolify notifications (Telegram, email or Discord) to hear when it goes unhealthy or a deploy fails.
+7. **Logs:** Coolify shows each container's logs. For Dozzle on the same server, add it as a separate service (Coolify's one-click catalogue or `docker-compose.monitoring.yml`) and keep it behind authentication.
+
 ## Telegram bot
 
 1. Message [@BotFather](https://t.me/BotFather), send `/newbot`, and copy the token.
@@ -121,6 +153,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://your-host/rates?currency=USD"
 | `GET /rates?currency=USD` | One currency across every bank |
 | `GET /banks` | Bank ids |
 | `GET /openapi.json` | OpenAPI 3.1 description of these endpoints |
+| `GET /healthz` | `{ ok, lastRefresh, banksOk, banksTotal, refreshing }`, 503 when rates are stale |
 | `GET /api/status` | What the dashboard shows: banks, refresh times, manual limit (no token usage) |
 | `GET /api/history?currency=USD` | Every saved snapshot: `[{ at, rates: { boc: [buying, selling] } }]` (what the History page is built from) |
 | `POST /api/refresh` | Manual refresh. Only accepted from the app's own page, 2 per hour |

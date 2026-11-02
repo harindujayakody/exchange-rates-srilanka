@@ -1,0 +1,20 @@
+# LKR Rates: web app + API + Telegram bot in one service, data kept in a named volume.
+#   docker compose up -d --build        then open http://localhost:3000
+# Settings come from .env locally; on Coolify, set them as environment variables in its UI instead.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "3000:3000"
+    volumes:
+      - lkr-data:/data
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  lkr-data:

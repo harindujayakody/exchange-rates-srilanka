@@ -1,6 +1,10 @@
 // node test.mjs  (no API key needed)
 import assert from 'node:assert';
-import { pageText, cleanRates, allowManual, ttColumns, bankTime, overLimit, trackUsage, authorized } from './server.mjs';
+import { pageText, cleanRates, allowManual, ttColumns, bankTime, overLimit, trackUsage, authorized, health } from './server.mjs';
+
+// Before the first refresh the service is starting, which counts as healthy.
+assert.deepStrictEqual({ ok: health().body.ok, lastRefresh: health().body.lastRefresh, banksTotal: health().body.banksTotal },
+  { ok: true, lastRefresh: null, banksTotal: 9 });
 import { views, resolve, best, flag, cardData, nextDailyAt } from './bot.mjs';
 
 // Daily post at 09:00 Sri Lanka time = 03:30 UTC.

@@ -2,6 +2,17 @@
 
 All notable changes to LKR Rates. Dates are in Sri Lanka time.
 
+## 1.5.0 — 2026-11-02
+
+### Added
+- **Docker:** a multi-stage `Dockerfile` (builds the web app, non-root user, bot image fonts included, health check) and `docker-compose.yml` with a persistent `lkr-data` volume.
+- **Dozzle log monitoring:** `docker-compose.monitoring.yml`, bound to `127.0.0.1` by default.
+- **Coolify deployment guide** in the README.
+- `GET /healthz` for Docker, Coolify and uptime monitors, plus one log line per refresh (banks ok, AI requests, failures).
+
+### Changed
+- The repository is now `harindujayakody/exchange-rates-srilanka`.
+
 ## 1.4.0 — 2026-11-02
 
 ### Added

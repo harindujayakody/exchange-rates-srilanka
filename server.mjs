@@ -195,11 +195,26 @@ async function restore() {
 }
 
 function refreshAll(trigger) {
+  const started = Date.now(), requests = state.usage.requests;
   state.refreshing ??= loadAll().then(async fresh => {
     state.lastRefresh = { at: new Date().toISOString(), trigger };
     if (fresh.length) await save(fresh).catch(e => console.error('could not save data:', e.message));
+    // One line per refresh, so log viewers (Dozzle, Coolify) show health at a glance.
+    const failed = Object.keys(BANKS).filter(id => !fresh.includes(id));
+    console.log(`refresh (${trigger}): ${fresh.length}/${Object.keys(BANKS).length} banks in ${Math.round((Date.now() - started) / 1000)}s, `
+      + `${state.usage.requests - requests} AI requests${failed.length ? `; failed: ${failed.map(id => `${id} (${state.banks[id]?.error})`).join(', ')}` : ''}`);
   }).finally(() => { state.refreshing = null; });
   return state.refreshing;
+}
+
+// Health for Docker / Coolify / uptime monitors: unhealthy only when rates have gone stale
+// (no refresh for two intervals) or every bank failed last time. Starting up counts as healthy.
+export function health(now = Date.now()) {
+  const total = Object.keys(BANKS).length;
+  const ok = Object.values(state.banks).filter(b => b.fetchedAt && !b.error).length;
+  const age = state.lastRefresh ? now - new Date(state.lastRefresh.at).getTime() : null;
+  const healthy = age === null || (age < REFRESH_MS * 2 + 10 * 60_000 && ok > 0);
+  return { healthy, body: { ok: healthy, lastRefresh: state.lastRefresh?.at ?? null, banksOk: ok, banksTotal: total, refreshing: !!state.refreshing } };
 }
 
 // On-demand refresh of one bank (the Telegram bot's Refresh button). Data younger than maxAgeMs is reused,
@@ -320,6 +335,7 @@ async function handle(req, res) {
   if (api && overLimit(clientIp(req))) return send(res, 429, { error: 'Too many requests, slow down' });
   if (currency && !/^[A-Z]{3}$/.test(currency)) return send(res, 400, { error: 'currency must be a 3 letter code like USD' });
   if (url.pathname === '/openapi.json') return send(res, 200, OPENAPI);
+  if (url.pathname === '/healthz') { const h = health(); return send(res, h.healthy ? 200 : 503, h.body); }
   if (api && !(route === 'api' && bank === 'refresh') && !authorized(req)) {
     return send(res, 401, { error: 'Missing or invalid API token. Send Authorization: Bearer <token>' });
   }
