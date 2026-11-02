@@ -2,6 +2,9 @@
 // It only reads the server's saved rates. The one network action is the per-bank Refresh button, which the
 // server answers from cache when that bank was fetched in the last 10 minutes.
 
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import path from 'node:path';
+
 const API = 'https://api.telegram.org/bot';
 const FRESH_MS = 10 * 60_000; // a bank fetched this recently is not fetched again on a Refresh tap
 const TOP = ['USD', 'EUR', 'GBP', 'AUD', 'CAD', 'JPY', 'SGD', 'CHF', 'AED', 'SAR', 'INR', 'CNY', 'QAR', 'KWD', 'NZD'];
@@ -183,6 +186,7 @@ export const views = {
       text: '<b>About LKR Rates</b>\n'
         + 'Rates are read from each bank\'s own public website every 3 hours and are indicative. '
         + 'Always confirm with your bank before you transact.\n\n'
+        + 'Send /daily to get the USD rate every morning at 9:00.\n\n'
         + 'Free and open source (MIT) by Harindu Jayakody.\nhttps://github.com/harindujayakody/exchnage-rates-srilanka',
       reply_markup: { inline_keyboard: [homeRow] },
     };
@@ -211,6 +215,16 @@ export function cardData(banks, history, code, now = Date.now()) {
   };
 }
 
+// Next daily post time (ms) at hh:mm Sri Lanka time. Sri Lanka is UTC+5:30 all year (no daylight saving).
+export function nextDailyAt(now = Date.now(), time = '09:00') {
+  const [h, m] = time.split(':').map(Number);
+  const offset = 330 * 60_000;
+  const local = new Date(now + offset);
+  let at = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), h, m) - offset;
+  if (at <= now) at += 86_400_000;
+  return at;
+}
+
 // Free text: a currency code or name ("usd", "yen", "dollar"), or a bank ("seylan", "boc").
 export function resolve(text, banks) {
   const q = text.trim().replace(/^\/(rate|bank)\s*/i, '').toLowerCase();
@@ -226,7 +240,10 @@ export function resolve(text, banks) {
   return null;
 }
 
-export function createBot({ token, admins = [], getBanks, refreshBank, getUsage, getHistory = () => [], renderCard = null, host = '', log = console }) {
+export function createBot({
+  token, admins = [], getBanks, refreshBank, getUsage, getHistory = () => [], renderCard = null, host = '',
+  dataFile = null, daily = { currency: 'USD', time: '09:00' }, log = console,
+}) {
   const call = async (method, body) => {
     const res = await fetch(`${API}${token}/${method}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -268,6 +285,44 @@ export function createBot({ token, admins = [], getBanks, refreshBank, getUsage,
     photoIds.set(key, json.result.photo.at(-1).file_id);
     if (photoIds.size > 200) photoIds.delete(photoIds.keys().next().value);
     if (caption !== view.text) await show(chatId, null, { text: view.text, reply_markup: view.reply_markup });
+    return json.result;
+  }
+
+  // Daily post: every subscribed chat gets the daily currency's rate image at the set Sri Lanka time, and
+  // yesterday's daily message in that chat is deleted first. Admins are subscribed unless they opt out.
+  // Saved to dataFile as { subscribers: { chatId: lastDailyMessageId | null }, optedOut: [chatId] }.
+  const subs = new Map();
+  const optedOut = new Set();
+  async function loadSubs() {
+    try {
+      const j = JSON.parse(await readFile(dataFile, 'utf8'));
+      for (const [id, msg] of Object.entries(j.subscribers ?? {})) subs.set(id, msg);
+      for (const id of j.optedOut ?? []) optedOut.add(String(id));
+    } catch { /* first run: nothing saved yet */ }
+    for (const a of admins) if (!subs.has(a) && !optedOut.has(a)) subs.set(a, null);
+  }
+  async function saveSubs() {
+    if (!dataFile) return;
+    await mkdir(path.dirname(dataFile), { recursive: true });
+    await writeFile(dataFile, JSON.stringify({ subscribers: Object.fromEntries(subs), optedOut: [...optedOut] }));
+  }
+  async function postDaily() {
+    for (const [chatId, lastId] of subs) {
+      try {
+        // Bots may delete their own messages for 48 hours, so yesterday's post can always go.
+        if (lastId) await call('deleteMessage', { chat_id: chatId, message_id: lastId }).catch(() => {});
+        const sent = await showCurrency(chatId, daily.currency);
+        subs.set(chatId, sent?.message_id ?? null);
+      } catch (e) {
+        log.error(`telegram daily post to ${chatId}:`, e.message);
+        // The user blocked the bot or deleted the chat: stop posting there.
+        if (/blocked|not found|deactivated|kicked/i.test(e.message)) subs.delete(chatId);
+      }
+    }
+    await saveSubs().catch(e => log.error('telegram daily: could not save subscribers:', e.message));
+  }
+  function scheduleDaily() {
+    setTimeout(() => postDaily().finally(scheduleDaily), nextDailyAt(Date.now(), daily.time) - Date.now());
   }
 
   function viewFor(data, userId) {
@@ -313,6 +368,15 @@ export function createBot({ token, admins = [], getBanks, refreshBank, getUsage,
     const chatId = m.chat.id, userId = m.from?.id;
     if (/^\/(start|help|menu)\b/.test(text)) return show(chatId, null, views.home(isAdmin(userId)));
     if (/^\/myid\b/.test(text)) return show(chatId, null, { text: `Your Telegram user id is <code>${userId}</code>. Add it to TELEGRAM_ADMIN_IDS to see usage.` });
+    if (/^\/daily\b/.test(text)) {
+      const id = String(chatId);
+      const on = !subs.has(id);
+      if (on) { subs.set(id, null); optedOut.delete(id); } else { subs.delete(id); optedOut.add(id); }
+      await saveSubs();
+      return show(chatId, null, { text: on
+        ? `🔔 Daily ${flag(daily.currency)} <b>${daily.currency}</b> rate is on. You'll get it every day at ${daily.time} (Sri Lanka time), and yesterday's is deleted so the chat stays tidy. Send /daily again to stop.`
+        : `🔕 Daily ${daily.currency} rate is off. Send /daily to turn it back on.` });
+    }
     if (/^\/usage\b/.test(text)) return show(chatId, null, isAdmin(userId) ? views.usage(getUsage()) : { text: 'Usage is only available to the bot admin.' });
     if (/^\/best\b/.test(text)) return show(chatId, null, views.best(getBanks()));
     if (/^\/currencies\b/.test(text)) return show(chatId, null, views.currencies(getBanks()));
@@ -333,10 +397,13 @@ export function createBot({ token, admins = [], getBanks, refreshBank, getUsage,
       { command: 'best', description: 'Best rates today' },
       { command: 'currencies', description: 'Pick a currency' },
       { command: 'banks', description: 'Pick a bank' },
+      { command: 'daily', description: `Daily ${daily.currency} rate at ${daily.time} on or off` },
       { command: 'usage', description: 'Token usage (admin)' },
       { command: 'myid', description: 'Show your Telegram user id' },
     ] }).catch(e => log.error('telegram:', e.message));
-    log.log('Telegram bot running');
+    await loadSubs();
+    scheduleDaily();
+    log.log(`Telegram bot running; daily ${daily.currency} post at ${daily.time} Sri Lanka time to ${subs.size} chat(s)`);
     let offset = 0;
     for (;;) {
       try {
@@ -354,5 +421,5 @@ export function createBot({ token, admins = [], getBanks, refreshBank, getUsage,
     }
   }
 
-  return { start };
+  return { start, postDaily, loadSubs }; // postDaily and loadSubs are exposed for tests
 }

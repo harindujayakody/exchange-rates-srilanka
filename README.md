@@ -95,7 +95,10 @@ Open the site in Chrome or Edge (Windows, macOS, Android) and choose **Install a
 | `/currencies`, `/banks` | Pick from a menu |
 | `usd`, `yen`, `dollar` | The rate image for that currency, with every bank in the caption |
 | `seylan`, `boc` | Every rate that bank publishes, with a Refresh button |
+| `/daily` | Turn the daily rate post on or off for this chat |
 | `/usage` | Admin only: requests, tokens and cost for today and all time |
+
+**Daily post:** every morning at 09:00 Sri Lanka time the bot sends the USD rate image to each subscribed chat and deletes the previous day's post, so only today's stays. Your admin chat is subscribed automatically; anyone can use `/daily`. It uses the latest saved rates (refreshed every 3 hours), so it spends no extra tokens.
 
 Rate images need the optional `@napi-rs/canvas` package (`npm install` in the project root installs it; without it the bot sends text). Set `PUBLIC_URL` to print your site address on them.
 
@@ -158,6 +161,8 @@ curl -H "Authorization: Bearer $TOKEN" "https://your-host/rates?currency=USD"
 | `TELEGRAM_ADMIN_IDS` | none | Telegram user ids that can see usage |
 | `API_TOKENS` | open | Comma-separated bearer tokens for the data API |
 | `PUBLIC_URL` | none | Your site address, printed on the bot's share images |
+| `DAILY_CURRENCY` | `USD` | Currency of the bot's daily post |
+| `DAILY_TIME` | `09:00` | Time of the daily post, 24-hour, Sri Lanka time |
 
 ## Add a bank
 

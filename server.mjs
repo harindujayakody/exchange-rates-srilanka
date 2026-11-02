@@ -381,6 +381,8 @@ if (process.argv[1]?.endsWith('server.mjs')) {
       renderCard: await createCardRenderer(),
       // Shown on the share image's footer.
       host: process.env.PUBLIC_URL ? new URL(process.env.PUBLIC_URL).host : 'github.com/harindujayakody',
+      dataFile: path.join(DATA, 'bot.json'),
+      daily: { currency: (process.env.DAILY_CURRENCY || 'USD').toUpperCase(), time: process.env.DAILY_TIME || '09:00' },
     }).start();
   }
 }

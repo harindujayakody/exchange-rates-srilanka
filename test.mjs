@@ -1,7 +1,13 @@
 // node test.mjs  (no API key needed)
 import assert from 'node:assert';
 import { pageText, cleanRates, allowManual, ttColumns, bankTime, overLimit, trackUsage, authorized } from './server.mjs';
-import { views, resolve, best, flag, cardData } from './bot.mjs';
+import { views, resolve, best, flag, cardData, nextDailyAt } from './bot.mjs';
+
+// Daily post at 09:00 Sri Lanka time = 03:30 UTC.
+assert.strictEqual(new Date(nextDailyAt(Date.parse('2026-11-02T01:00:00Z'))).toISOString(), '2026-11-02T03:30:00.000Z'); // 06:30 SL: today
+assert.strictEqual(new Date(nextDailyAt(Date.parse('2026-11-02T03:30:00Z'))).toISOString(), '2026-11-03T03:30:00.000Z'); // exactly 09:00: tomorrow
+assert.strictEqual(new Date(nextDailyAt(Date.parse('2026-11-02T20:00:00Z'))).toISOString(), '2026-11-03T03:30:00.000Z'); // 01:30 SL next day
+assert.strictEqual(new Date(nextDailyAt(Date.parse('2026-11-02T01:00:00Z'), '18:45')).toISOString(), '2026-11-02T13:15:00.000Z');
 
 assert.strictEqual(flag('USD'), '🇺🇸');
 assert.strictEqual(flag('EUR'), '🇪🇺');
@@ -111,3 +117,27 @@ assert.deepStrictEqual(cleanRates(null), []);
 const text = pageText('<script>x</script><td>US DOLLARS</td><!--<td>235.66</td>--><td>328.50</td>');
 assert.ok(text.includes('US DOLLARS 328.50') && !text.includes('x ') && !text.includes('235'));
 console.log('ok');
+
+// Daily post: first run sends, second run deletes yesterday's message before sending the new one.
+{
+  const { createBot } = await import('./bot.mjs');
+  const calls = [];
+  let nextId = 100;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    const method = String(url).split('/').at(-1);
+    calls.push({ method, body: JSON.parse(init.body) });
+    return { json: async () => ({ ok: true, result: { message_id: nextId++ } }) };
+  };
+  try {
+    const bot = createBot({ token: 'test', admins: ['42'], getBanks: () => banks, getUsage: () => ({}), log: { log() {}, error() {} } });
+    await bot.loadSubs();
+    await bot.postDaily();
+    await bot.postDaily();
+    assert.deepStrictEqual(calls.map(c => c.method), ['sendMessage', 'deleteMessage', 'sendMessage']);
+    assert.strictEqual(calls[1].body.message_id, 100);
+    assert.strictEqual(String(calls[1].body.chat_id), '42');
+    assert.match(calls[2].body.text, /USD → LKR/);
+  } finally { globalThis.fetch = realFetch; }
+}
+console.log('daily ok');

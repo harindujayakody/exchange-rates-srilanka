@@ -6,6 +6,7 @@ All notable changes to LKR Rates. Dates are in Sri Lanka time.
 
 ### Added
 - **History page** (`/history`) for every currency the banks quote: one row per day (Sri Lanka time) with the best and worst buying rate and the best and worst selling rate, each with its bank, plus the extremes over 1W, 1M, 6M, 1Y or all saved history. Built from the snapshots the server already saves every 3 hours, so it costs no extra requests or tokens.
+- **Daily USD rate on Telegram at 9:00 AM** (Sri Lanka time): the bot posts the USD rate image to every subscribed chat and deletes the previous day's post first, so the chat keeps only today's. Admins are subscribed by default; anyone can switch it with `/daily`. Subscribers are saved in `data/bot.json`. Set `DAILY_CURRENCY` and `DAILY_TIME` to change it.
 - **Page links in the header and footer** (Rates, History) with Lucide icons; every footer link now has an icon.
 
 ## 1.3.0 — 2026-11-02
