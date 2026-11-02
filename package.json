@@ -1,0 +1,17 @@
+{
+  "name": "lkr-rates",
+  "version": "1.0.0",
+  "description": "Telegraphic transfer exchange rates from Sri Lankan banks, read by a free AI model and compared side by side.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "author": "Harindu Jayakody",
+  "repository": "github:harindujayakody/exchnage-rates-srilanka",
+  "engines": { "node": ">=20.6" },
+  "scripts": {
+    "build": "cd web && npm ci && npm run build",
+    "start": "node server.mjs",
+    "dev": "node --env-file=.env server.mjs",
+    "test": "node test.mjs"
+  }
+}
