@@ -2,6 +2,15 @@
 
 All notable changes to LKR Rates. Dates are in Sri Lanka time.
 
+## 1.6.0 — 2026-11-03
+
+### Added
+- **Push agent for banks that block the server.** ComBank, BOC and Nations Trust return 403 to datacenter IPs. `push-agent.mjs` runs on a home PC with plain Node, fetches just those banks every 3 hours and sends them to the server's new `POST /api/push` (bearer `PUSH_TOKEN`; only `PUSH_BANKS`; rates validated; never older than what is saved). With `PUSH_TOKEN` set, the server stops fetching those banks itself.
+- `scripts/install-push-agent.ps1` installs the agent as a Windows background task (starts at login, no window, restarts if it stops), generates the shared token and copies it to the clipboard.
+
+### Changed
+- **No raw fetch errors for visitors.** A bank with saved rates shows them with a quiet "Stale" badge (when the last update failed or the rates are over 7 hours old); "Unavailable" only appears before a bank's first rates. The bot says "Showing the last saved rates" instead of the error.
+
 ## 1.5.0 — 2026-11-02
 
 ### Added

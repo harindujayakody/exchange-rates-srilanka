@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
-  AlertTriangle, ArrowDown, ArrowUp, Braces, Bug, ChartLine, History, Scale, Send, Download, ExternalLink, Landmark, Loader2, Moon, RefreshCw, Search, Share2, Sun, X,
+  AlertTriangle, ArrowDown, Clock, ArrowUp, Braces, Bug, ChartLine, History, Scale, Send, Download, ExternalLink, Landmark, Loader2, Moon, RefreshCw, Search, Share2, Sun, X,
 } from "lucide-react"
 import { Line, LineChart, Tooltip as ChartTooltip, YAxis } from "recharts"
 import { toast } from "sonner"
@@ -702,7 +702,7 @@ function BankSheet({ bank, now }: { bank: Bank; now: number }) {
         </a>
       </div>
       {bank.rates.length === 0 ? (
-        bank.error ? <p className="py-4 text-sm text-muted-foreground">{bank.error}</p>
+        bank.error ? <p className="py-4 text-sm text-muted-foreground">No rates from this bank yet. They'll appear after the next update.</p>
           : <div className="space-y-2 py-4">{Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-6 w-full" />)}</div>
       ) : (
         <Table>
@@ -819,17 +819,21 @@ function BankLogo({ bank }: { bank: Bank }) {
   )
 }
 
+// Visitors never see raw fetch errors (such as a 403): a bank with saved rates shows them, flagged "Stale" when the
+// last update failed or they are older than STALE_MS; "Unavailable" only means no rates have ever been saved.
+const STALE_MS = 7 * 3_600_000
 function BankState({ bank }: { bank: Bank }) {
-  if (!bank.error) return null
-  const stale = bank.rates.length > 0
+  const saved = bank.rates.length > 0
+  const old = saved && bank.fetchedAt != null && Date.now() - new Date(bank.fetchedAt).getTime() > STALE_MS
+  if (saved ? !bank.error && !old : !bank.error) return null
   return (
     <Tooltip>
       <TooltipTrigger render={<span />} className="inline-flex align-middle">
-        <span className="inline-flex items-center gap-1 rounded border border-down px-1.5 py-0.5 text-[11px] font-semibold text-down">
-          <AlertTriangle className="size-3" aria-hidden /> {stale ? "Stale" : "Unavailable"}
+        <span className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-semibold ${saved ? "border-border text-muted-foreground" : "border-down text-down"}`}>
+          {saved ? <Clock className="size-3" aria-hidden /> : <AlertTriangle className="size-3" aria-hidden />} {saved ? "Stale" : "Unavailable"}
         </span>
       </TooltipTrigger>
-      <TooltipContent>{stale ? `Last update failed: ${bank.error}` : bank.error}</TooltipContent>
+      <TooltipContent>{saved ? `Showing the last saved rates, from ${relative(bank.fetchedAt, Date.now())}.` : "No rates from this bank yet. They'll appear after the next update."}</TooltipContent>
     </Tooltip>
   )
 }

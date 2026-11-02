@@ -116,6 +116,20 @@ Both can read every container, and Portainer can also control them, so they list
 6. **Health check:** path `/healthz`, port 5821. Turn on Coolify notifications (Telegram, email or Discord) to hear when it goes unhealthy or a deploy fails.
 7. **Logs:** Coolify shows each container's logs. For Dozzle on the same server, add it as a separate service (Coolify's one-click catalogue or `docker-compose.monitoring.yml`) and keep it behind authentication.
 
+### Banks that block the server (push agent)
+
+Some banks (ComBank, BOC and Nations Trust) block datacenter IPs with a 403, so a hosted server can't read them, while a home connection can. `push-agent.mjs` runs on a home PC with plain Node (no Docker). Every 3 hours it fetches just those banks and sends them to the server, which stops fetching them itself.
+
+1. On the PC, with `OPENROUTER_API_KEY` in `.env`, install the background task (starts at login, no window, restarts if it stops):
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts\install-push-agent.ps1
+   ```
+   It adds `PUSH_TO` and a random `PUSH_TOKEN` to `.env` and copies the token to your clipboard.
+2. On the server, set `PUSH_TOKEN` to the same value and redeploy.
+3. Logs are in `push-agent.log`. Remove the task with `scripts\install-push-agent.ps1 -Uninstall`.
+
+Visitors never see a raw error. A bank with saved rates shows them, with a "Stale" badge if they're more than 7 hours old (the PC was off). "Unavailable" only appears before a bank's first rates arrive.
+
 ## Telegram bot
 
 1. Message [@BotFather](https://t.me/BotFather), send `/newbot`, and copy the token.
@@ -159,6 +173,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://your-host/rates?currency=USD"
 | `GET /rates?currency=USD` | One currency across every bank |
 | `GET /banks` | Bank ids |
 | `GET /openapi.json` | OpenAPI 3.1 description of these endpoints |
+| `POST /api/push` | For the push agent: `{ banks: { boc: { rates, fetchedAt, bankUpdatedAt } } }` with `Authorization: Bearer <PUSH_TOKEN>`. Accepts only `PUSH_BANKS`, validates the rates, ignores anything older than what is saved |
 | `GET /healthz` | `{ ok, lastRefresh, banksOk, banksTotal, refreshing }`, 503 when rates are stale |
 | `GET /api/status` | What the dashboard shows: banks, refresh times, manual limit (no token usage) |
 | `GET /api/history?currency=USD` | Every saved snapshot: `[{ at, rates: { boc: [buying, selling] } }]` (what the History page is built from) |
@@ -200,6 +215,9 @@ curl -H "Authorization: Bearer $TOKEN" "https://your-host/rates?currency=USD"
 | `TELEGRAM_ADMIN_IDS` | none | Telegram user ids that can see usage |
 | `API_TOKENS` | open | Comma-separated bearer tokens for the data API |
 | `PUBLIC_URL` | none | Your site address, printed on the bot's share images |
+| `PUSH_TOKEN` | off | Shared secret for the push agent; when set, the server stops fetching `PUSH_BANKS` itself |
+| `PUSH_BANKS` | `combank,boc,ntb` | Banks the push agent sends |
+| `PUSH_TO` | none | Push agent only: the server to send to, e.g. `https://rates.infiax.dev` |
 | `DAILY_CURRENCY` | `USD` | Currency of the bot's daily post |
 | `DAILY_TIME` | `09:00` | Time of the daily post, 24-hour, Sri Lanka time |
 
@@ -216,6 +234,7 @@ HNB and Pan Asia aren't included yet. Their pages only show rates after running 
 ```
 server.mjs        API, scheduler, AI extraction, security (no dependencies)
 bot.mjs           Telegram bot (no dependencies)
+push-agent.mjs    home push agent for banks that block the server (scripts/install-push-agent.ps1)
 cardimage.mjs     draws the share image in Node for the bot (optional @napi-rs/canvas)
 test.mjs          checks for parsing, dates, limits, usage, tokens, bot (npm test)
 PRODUCT.md        who it is for and what it must do

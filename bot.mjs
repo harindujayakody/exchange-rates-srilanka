@@ -135,7 +135,8 @@ export const views = {
     return {
       text: `<b>${esc(bank.name)}</b>\n`
         + `Bank updated: ${esc(bankClock(bank.bankUpdatedAt))}\nFetched ${ago(bank.fetchedAt, now)}`
-        + (bank.error ? `\n⚠️ Last update failed: ${esc(bank.error)}` : '') + '\n\n'
+        // Never show raw fetch errors (such as a 403): say the saved rates are being shown.
+        + (bank.error ? `\n⚠️ ${bank.rates.length ? 'Showing the last saved rates.' : 'No rates from this bank yet.'}` : '') + '\n\n'
         + (bank.rates.length ? `<pre>${esc(lines.join('\n'))}</pre>` : '<i>No rates saved yet.</i>')
         + `\n<a href="${esc(bank.url)}">Bank's rates page</a>`,
       reply_markup: { inline_keyboard: [
@@ -354,7 +355,7 @@ export function createBot({
         await refreshBank(id, FRESH_MS);
         await show(chatId, messageId, viewFor(`b:${id}`, q.from.id));
       } catch (e) {
-        await call('sendMessage', { chat_id: chatId, text: `Couldn't refresh ${bank?.name ?? id}: ${e.message}. Showing the last saved rates.` });
+        await call('sendMessage', { chat_id: chatId, text: `Couldn't get new ${bank?.name ?? id} rates right now. Showing the last saved rates.` });
       }
       return;
     }

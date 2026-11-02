@@ -1,6 +1,26 @@
 // node test.mjs  (no API key needed)
 import assert from 'node:assert';
-import { pageText, cleanRates, allowManual, ttColumns, bankTime, overLimit, trackUsage, authorized, health } from './server.mjs';
+import { pageText, cleanRates, allowManual, ttColumns, bankTime, overLimit, trackUsage, authorized, health, acceptPush } from './server.mjs';
+
+// Push from the home agent: allowed banks only, sane rates, real non-future time, never older than what is saved.
+{
+  const now = Date.parse('2026-11-03T06:00:00Z');
+  const banks = { boc: { rates: [{ currency: 'USD', buying: 328, selling: 337 }], fetchedAt: '2026-11-03T03:00:00Z' } };
+  const good = { rates: [{ currency: 'USD', buying: 328.1, selling: 337.1 }], fetchedAt: '2026-11-03T05:59:00Z', bankUpdatedAt: '2026-11-03T11:30:00+05:30' };
+  const accepted = acceptPush(banks, { banks: {
+    boc: good,
+    combank: { ...good, rates: [{ currency: 'USD', buying: 400, selling: 300 }] },  // selling below buying: rejected
+    seylan: good,                                                                    // not in the allowed list
+    ntb: { ...good, fetchedAt: '2026-11-03T09:00:00Z' },                             // in the future
+    dfcc: { ...good, fetchedAt: 'yesterday' },                                       // not a timestamp
+  } }, ['boc', 'combank', 'ntb', 'dfcc'], now);
+  assert.deepStrictEqual(accepted, ['boc']);
+  assert.strictEqual(banks.boc.rates[0].buying, 328.1);
+  assert.strictEqual(banks.boc.error, null);
+  assert.strictEqual(banks.boc.bankUpdatedAt, '2026-11-03T11:30:00+05:30');
+  assert.deepStrictEqual(acceptPush(banks, { banks: { boc: { ...good, fetchedAt: '2026-11-03T04:00:00Z' } } }, ['boc'], now), []); // older than saved
+  assert.deepStrictEqual(acceptPush(banks, null, ['boc'], now), []);
+}
 
 // Before the first refresh the service is starting, which counts as healthy.
 assert.deepStrictEqual({ ok: health().body.ok, lastRefresh: health().body.lastRefresh, banksTotal: health().body.banksTotal },

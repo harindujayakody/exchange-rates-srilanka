@@ -33,8 +33,12 @@ const BANKS = {
   // shortcut: HNB renders rates with JavaScript only, add it with a headless browser if needed.
 };
 const MODELS = (process.env.OPENROUTER_MODELS || 'nvidia/nemotron-3.5-super-vl:free,google/gemma-4-31b-it:free').split(',');
-const REFRESH_MS = (Number(process.env.REFRESH_HOURS) || 3) * 3_600_000;
+export const REFRESH_MS = (Number(process.env.REFRESH_HOURS) || 3) * 3_600_000;
 const MANUAL_LIMIT = 2; // per hour, for the whole server: protects the free OpenRouter quota
+// Banks that block the server's IP can be fetched by push-agent.mjs on a home connection instead, which sends
+// them to POST /api/push. With PUSH_TOKEN set, the server stops fetching those banks itself.
+const PUSH_TOKEN = process.env.PUSH_TOKEN || '';
+const PUSH_BANKS = PUSH_TOKEN ? (process.env.PUSH_BANKS || 'combank,boc,ntb').split(',').map(s => s.trim()).filter(Boolean) : [];
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130 Safari/537.36';
 const DIST = path.resolve(import.meta.dirname, 'web/dist');
 const DATA = path.resolve(import.meta.dirname, process.env.DATA_DIR || 'data');
@@ -153,7 +157,7 @@ async function extract(text, tt) {
   return { model: body.model, tokens: u.total_tokens || 0, bankUpdatedAt: json.updatedAt || null, rates: cleanRates(ttColumns(json.rates, tt)) };
 }
 
-async function load(bank) {
+export async function load(bank) {
   const { url, parse, tt } = BANKS[bank];
   const page = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20000) });
   if (!page.ok) throw new Error(`page returned ${page.status}`);
@@ -168,7 +172,7 @@ async function load(bank) {
 // One bank at a time: free models reject bursts of parallel requests. Returns the banks that loaded.
 async function loadAll() {
   const fresh = [];
-  for (const bank of Object.keys(BANKS)) {
+  for (const bank of Object.keys(BANKS).filter(id => !PUSH_BANKS.includes(id))) {
     try { state.banks[bank] = await load(bank).catch(() => load(bank)); fresh.push(bank); } // one retry
     catch (e) { state.banks[bank] = { ...state.banks[bank], error: e.message }; } // keep the last good rates
   }
@@ -200,8 +204,8 @@ function refreshAll(trigger) {
     state.lastRefresh = { at: new Date().toISOString(), trigger };
     if (fresh.length) await save(fresh).catch(e => console.error('could not save data:', e.message));
     // One line per refresh, so log viewers (Dozzle, Coolify) show health at a glance.
-    const failed = Object.keys(BANKS).filter(id => !fresh.includes(id));
-    console.log(`refresh (${trigger}): ${fresh.length}/${Object.keys(BANKS).length} banks in ${Math.round((Date.now() - started) / 1000)}s, `
+    const failed = Object.keys(BANKS).filter(id => !fresh.includes(id) && !PUSH_BANKS.includes(id));
+    console.log(`refresh (${trigger}): ${fresh.length}/${Object.keys(BANKS).length - PUSH_BANKS.length} banks${PUSH_BANKS.length ? ` (+${PUSH_BANKS.length} pushed)` : ''} in ${Math.round((Date.now() - started) / 1000)}s, `
       + `${state.usage.requests - requests} AI requests${failed.length ? `; failed: ${failed.map(id => `${id} (${state.banks[id]?.error})`).join(', ')}` : ''}`);
   }).finally(() => { state.refreshing = null; });
   return state.refreshing;
@@ -221,6 +225,7 @@ export function health(now = Date.now()) {
 // so repeated taps never spend AI quota; concurrent taps share one fetch.
 const inflight = new Map();
 function refreshBank(id, maxAgeMs = 10 * 60_000) {
+  if (PUSH_BANKS.includes(id)) return Promise.resolve(false); // arrives from the push agent; keep the last push
   const b = state.banks[id];
   if (b?.fetchedAt && !b.error && Date.now() - new Date(b.fetchedAt).getTime() < maxAgeMs) return Promise.resolve(false);
   if (!inflight.has(id)) {
@@ -266,10 +271,40 @@ const sameOrigin = req => {
 // Optional API tokens for outside callers (agents such as Hermes, scripts). When API_TOKENS is set, the data
 // endpoints need `Authorization: Bearer <token>` unless the request comes from this app's own page.
 const API_TOKENS = (process.env.API_TOKENS || '').split(',').map(t => t.trim()).filter(Boolean);
-export function authorized(req, tokens = API_TOKENS) {
-  if (!tokens.length || sameOrigin(req)) return true;
+const bearerMatches = (req, tokens) => {
   const given = req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1] ?? '';
   return tokens.some(t => t.length === given.length && timingSafeEqual(Buffer.from(t), Buffer.from(given)));
+};
+export function authorized(req, tokens = API_TOKENS) {
+  return !tokens.length || sameOrigin(req) || bearerMatches(req, tokens);
+}
+
+// Validates a push from the home agent into `banks`: only allowed banks, rates that pass the same checks as
+// fetched ones, a real timestamp not in the future, and never older than what is already saved. Returns accepted ids.
+export function acceptPush(banks, body, allowed, now = Date.now()) {
+  const accepted = [];
+  for (const [id, b] of Object.entries(body?.banks ?? {})) {
+    if (!allowed.includes(id) || !b || typeof b !== 'object') continue;
+    const rates = cleanRates(b.rates);
+    const at = Date.parse(b.fetchedAt);
+    if (!rates.length || !(at <= now + 60_000) || at <= new Date(banks[id]?.fetchedAt ?? 0).getTime()) continue;
+    banks[id] = {
+      rates, fetchedAt: new Date(at).toISOString(), error: null, model: 'pushed', tokens: 0,
+      bankUpdatedAt: typeof b.bankUpdatedAt === 'string' ? bankTime(b.bankUpdatedAt) : null,
+    };
+    accepted.push(id);
+  }
+  return accepted;
+}
+
+async function readJson(req, limit = 256_000) {
+  const chunks = [];
+  let size = 0;
+  for await (const c of req) {
+    if ((size += c.length) > limit) throw Object.assign(new Error('too large'), { status: 413 });
+    chunks.push(c);
+  }
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
 const OPENAPI = {
@@ -336,6 +371,15 @@ async function handle(req, res) {
   if (currency && !/^[A-Z]{3}$/.test(currency)) return send(res, 400, { error: 'currency must be a 3 letter code like USD' });
   if (url.pathname === '/openapi.json') return send(res, 200, OPENAPI);
   if (url.pathname === '/healthz') { const h = health(); return send(res, h.healthy ? 200 : 503, h.body); }
+  if (url.pathname === '/api/push' && req.method === 'POST') {
+    if (!PUSH_TOKEN || !bearerMatches(req, [PUSH_TOKEN])) return send(res, 401, { error: 'Missing or invalid push token' });
+    let body;
+    try { body = await readJson(req); } catch (e) { return send(res, e.status ?? 400, { error: 'Send a JSON body under 256 KB' }); }
+    const accepted = acceptPush(state.banks, body, PUSH_BANKS);
+    if (accepted.length) await save(accepted, new Date().toISOString()).catch(e => console.error('could not save data:', e.message));
+    console.log(`push: accepted ${accepted.join(', ') || 'nothing'}`);
+    return send(res, 200, { accepted });
+  }
   if (api && !(route === 'api' && bank === 'refresh') && !authorized(req)) {
     return send(res, 401, { error: 'Missing or invalid API token. Send Authorization: Bearer <token>' });
   }
