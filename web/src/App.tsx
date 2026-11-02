@@ -15,7 +15,7 @@ import { shareCard } from "@/share"
 import HistoryPage from "@/HistoryPage"
 import { Flag } from "@/flags"
 
-const REPO = "https://github.com/harindujayakody/exchnage-rates-srilanka"
+const REPO = "https://github.com/harindujayakody/exchange-rates-srilanka"
 
 type Rate = { currency: string; buying: number; selling: number }
 export type Bank = {
@@ -772,7 +772,7 @@ function Footer({ banks, go }: { banks: Bank[]; go: (p: Page) => (e: React.Mouse
             © {new Date().getFullYear()}{" "}
             <a href="https://github.com/harindujayakody" target="_blank" rel="noreferrer" className="font-medium text-foreground hover:underline">Harindu Jayakody</a>
             {" · "}
-            <a href={REPO} target="_blank" rel="noreferrer" className="hover:text-foreground hover:underline">exchnage-rates-srilanka</a>
+            <a href={REPO} target="_blank" rel="noreferrer" className="hover:text-foreground hover:underline">exchange-rates-srilanka</a>
           </p>
           <p>Indicative rates. Confirm with your bank before you transact.</p>
         </div>

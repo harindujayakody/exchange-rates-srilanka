@@ -187,7 +187,7 @@ export const views = {
         + 'Rates are read from each bank\'s own public website every 3 hours and are indicative. '
         + 'Always confirm with your bank before you transact.\n\n'
         + 'Send /daily to get the USD rate every morning at 9:00.\n\n'
-        + 'Free and open source (MIT) by Harindu Jayakody.\nhttps://github.com/harindujayakody/exchnage-rates-srilanka',
+        + 'Free and open source (MIT) by Harindu Jayakody.\nhttps://github.com/harindujayakody/exchange-rates-srilanka',
       reply_markup: { inline_keyboard: [homeRow] },
     };
   },

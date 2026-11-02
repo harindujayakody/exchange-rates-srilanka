@@ -6,7 +6,7 @@
   "private": true,
   "license": "MIT",
   "author": "Harindu Jayakody",
-  "repository": "github:harindujayakody/exchnage-rates-srilanka",
+  "repository": "github:harindujayakody/exchange-rates-srilanka",
   "engines": {
     "node": ">=20.6"
   },

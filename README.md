@@ -64,8 +64,8 @@ The model only transcribes, which it does reliably, and the code does the reason
 ## Quick start
 
 ```bash
-git clone https://github.com/harindujayakody/exchnage-rates-srilanka.git
-cd exchnage-rates-srilanka
+git clone https://github.com/harindujayakody/exchange-rates-srilanka.git
+cd exchange-rates-srilanka
 cp .env.example .env          # then paste your OpenRouter key
 npm install                   # optional: lets the Telegram bot send rate images
 npm run build                 # builds the web UI
@@ -207,4 +207,4 @@ Flags from [country-flag-icons](https://gitlab.com/catamphetamine/country-flag-i
 
 [MIT](LICENSE). Use it, fork it or ship it commercially. Just keep the copyright notice and credit the original project:
 
-> Based on [LKR Rates](https://github.com/harindujayakody/exchnage-rates-srilanka) by Harindu Jayakody.
+> Based on [LKR Rates](https://github.com/harindujayakody/exchange-rates-srilanka) by Harindu Jayakody.

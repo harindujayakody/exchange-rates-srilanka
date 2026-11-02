@@ -36,7 +36,7 @@ Rates are read directly from each bank's own public page every 3 hours (not a th
 
 ## Brand Commitments
 
-- Name: LKR Rates. Repository: github.com/harindujayakody/exchnage-rates-srilanka. Built by Harindu Jayakody; credit must stay visible.
+- Name: LKR Rates. Repository: github.com/harindujayakody/exchange-rates-srilanka. Built by Harindu Jayakody; credit must stay visible.
 - Logo: web/public/logo.png (wallet icon by designhub, Flaticon; credit required).
 - Bank logos in web/public/logos belong to their banks.
 - User-set constraints: bold, modern, black and white (light and dark themes, following the device with a toggle); Poppins for headings, Inter for body text, JetBrains Mono for numbers; no "AI bloat" design; the headline is the bank name only, no "pays the most for" sentence; inline country flags before currency codes.
