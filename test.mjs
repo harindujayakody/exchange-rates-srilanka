@@ -1,6 +1,50 @@
 // node test.mjs  (no API key needed)
 import assert from 'node:assert';
-import { pageText, cleanRates, allowManual, ttColumns, bankTime, overLimit } from './server.mjs';
+import { pageText, cleanRates, allowManual, ttColumns, bankTime, overLimit, trackUsage, authorized } from './server.mjs';
+import { views, resolve, best, flag } from './bot.mjs';
+
+assert.strictEqual(flag('USD'), '🇺🇸');
+assert.strictEqual(flag('EUR'), '🇪🇺');
+assert.strictEqual(flag('CNH'), '🇨🇳');
+
+// Usage: all-time totals plus a bucket per Sri Lanka date (UTC 20:00 is already the next day in Colombo).
+const usage = { requests: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, cost: 0 };
+trackUsage(usage, { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 }, new Date('2026-11-02T10:00:00Z'));
+trackUsage(usage, { prompt_tokens: 50, completion_tokens: 10, total_tokens: 60 }, new Date('2026-11-02T20:00:00Z'));
+assert.strictEqual(usage.totalTokens, 180);
+assert.strictEqual(usage.requests, 2);
+assert.deepStrictEqual(Object.keys(usage.daily), ['2026-11-02', '2026-11-03']);
+assert.strictEqual(usage.daily['2026-11-03'].totalTokens, 60);
+assert.match(views.usage(usage, new Date('2026-11-02T10:00:00Z')).text, /Tokens\s+120/);
+
+// API tokens: open when none are configured; otherwise only a matching bearer token passes.
+const reqWith = auth => ({ headers: { host: 'x', ...(auth ? { authorization: auth } : {}) } });
+assert.strictEqual(authorized(reqWith(), []), true);
+assert.strictEqual(authorized(reqWith(), ['s3cret']), false);
+assert.strictEqual(authorized(reqWith('Bearer wrong!'), ['s3cret']), false);
+assert.strictEqual(authorized(reqWith('Bearer s3cret'), ['s3cret']), true);
+assert.strictEqual(authorized({ headers: { 'sec-fetch-site': 'same-origin' } }, ['s3cret']), true);
+
+// Bot: best picks, free-text lookup, and views stay valid Telegram HTML.
+const banks = [
+  { id: 'seylan', name: 'Seylan Bank', short: 'Seylan', url: 'https://x', rates: [{ currency: 'USD', buying: 329, selling: 336 }] },
+  { id: 'boc', name: 'Bank of Ceylon', short: 'BOC', url: 'https://y', rates: [{ currency: 'USD', buying: 328.1, selling: 337.1 }, { currency: 'JPY', buying: 2.05, selling: 2.14 }] },
+];
+assert.strictEqual(best(banks, 'USD').buy.bank.id, 'seylan');
+assert.strictEqual(best(banks, 'USD').sell.bank.id, 'seylan');
+assert.strictEqual(best(banks, 'EUR'), null);
+assert.deepStrictEqual(resolve('usd', banks), { type: 'currency', code: 'USD' });
+assert.deepStrictEqual(resolve('yen', banks), { type: 'currency', code: 'JPY' });
+assert.strictEqual(resolve('/bank boc', banks).bank.id, 'boc');
+assert.strictEqual(resolve('ceylon', banks).bank.id, 'boc');
+assert.strictEqual(resolve('zzz', banks), null);
+assert.match(views.currency(banks, 'USD').text, /Seylan Bank pays <b>Rs 329\.00<\/b>/);
+assert.doesNotMatch(views.bank({ ...banks[0], error: '<oops>' }).text, /<oops>/); // escaped
+assert.ok(!views.home(false).reply_markup.inline_keyboard.flat().some(b => b.callback_data === 'm:usage'));
+assert.ok(views.home(true).reply_markup.inline_keyboard.flat().some(b => b.callback_data === 'm:usage'));
+for (const v of [views.home(true), views.currencies(banks), views.currencies(banks, true), views.banks(banks), views.best(banks)]) {
+  for (const b of v.reply_markup.inline_keyboard.flat()) assert.ok(Buffer.byteLength(b.callback_data) <= 64);
+}
 
 for (let i = 0; i < 3; i++) assert.strictEqual(overLimit('1.1.1.1', 1000, 3), false);
 assert.strictEqual(overLimit('1.1.1.1', 1000, 3), true);   // 4th request in the same minute

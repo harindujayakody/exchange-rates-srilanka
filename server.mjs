@@ -3,29 +3,31 @@
 import http from 'node:http';
 import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { timingSafeEqual } from 'node:crypto';
+import { createBot } from './bot.mjs';
 
 // tt = [buying, selling] positions of the Telegraphic Transfer rates among a row's numbers (0 = first).
 // All checked against the live pages on 2026-11-02.
 // shortcut: if a bank reorders its table columns, update tt here.
 const BANKS = {
-  combank: { name: 'Commercial Bank', url: 'https://www.combank.lk/rates-tariff', tt: [4, 5] },
-  boc: { name: 'Bank of Ceylon', url: 'https://www.boc.lk/rates-tariff', tt: [4, 5] },
-  peoples: { name: "People's Bank", url: 'https://www.peoplesbank.lk/exchange-rates/', tt: [4, 5] },
+  combank: { name: 'Commercial Bank', short: 'Commercial', url: 'https://www.combank.lk/rates-tariff', tt: [4, 5] },
+  boc: { name: 'Bank of Ceylon', short: 'BOC', url: 'https://www.boc.lk/rates-tariff', tt: [4, 5] },
+  peoples: { name: "People's Bank", short: "People's", url: 'https://www.peoplesbank.lk/exchange-rates/', tt: [4, 5] },
   sampath: {
-    name: 'Sampath Bank', url: 'https://www.sampath.lk/api/exchange-rates',
+    name: 'Sampath Bank', short: 'Sampath', url: 'https://www.sampath.lk/api/exchange-rates',
     // Already JSON, so no model needed.
     parse: ({ data = [] }) => ({
       bankUpdatedAt: data[0]?.RateWEF ?? null,
       rates: data.map(r => ({ currency: r.CurrCode, buying: r.TTBUY, selling: r.TTSEL })),
     }),
   },
-  ndb: { name: 'NDB Bank', url: 'https://www.ndbbank.com/rates/exchange-rates', tt: [4, 5] },
-  seylan: { name: 'Seylan Bank', url: 'https://www.seylan.lk/exchange-rates', tt: [4, 5] },
-  ntb: { name: 'Nations Trust Bank', url: 'https://www.nationstrust.com/exchange-rates', tt: [4, 5] },
+  ndb: { name: 'NDB Bank', short: 'NDB', url: 'https://www.ndbbank.com/rates/exchange-rates', tt: [4, 5] },
+  seylan: { name: 'Seylan Bank', short: 'Seylan', url: 'https://www.seylan.lk/exchange-rates', tt: [4, 5] },
+  ntb: { name: 'Nations Trust Bank', short: 'NTB', url: 'https://www.nationstrust.com/exchange-rates', tt: [4, 5] },
   // DD buy, note encashment, TT buy, DD/TT sell, note sell
-  dfcc: { name: 'DFCC Bank', url: 'https://www.dfcc.lk/rates-and-tariff/exchange-rates', tt: [2, 3] },
+  dfcc: { name: 'DFCC Bank', short: 'DFCC', url: 'https://www.dfcc.lk/rates-and-tariff/exchange-rates', tt: [2, 3] },
   // buying TT, buying notes, selling TT, selling notes
-  nsb: { name: 'National Savings Bank', url: 'https://www.nsb.lk/rates-tarriffs/nsb-exchange-rates/', tt: [0, 2] },
+  nsb: { name: 'National Savings Bank', short: 'NSB', url: 'https://www.nsb.lk/rates-tarriffs/nsb-exchange-rates/', tt: [0, 2] },
   // shortcut: Pan Asia serves a JavaScript bot check instead of its rates, so it is left out.
   // shortcut: HNB renders rates with JavaScript only, add it with a headless browser if needed.
 };
@@ -94,6 +96,22 @@ export function allowManual(times, now = Date.now()) {
   return recent.length < MANUAL_LIMIT ? [...recent, now] : null;
 }
 
+// Adds one OpenRouter response's token counts to the all-time totals and to today's (Sri Lanka date) bucket.
+export const colomboDate = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Colombo' });
+export function trackUsage(usage, u, now = new Date()) {
+  const add = (t = {}) => ({
+    requests: (t.requests || 0) + 1,
+    promptTokens: (t.promptTokens || 0) + (u.prompt_tokens || 0),
+    completionTokens: (t.completionTokens || 0) + (u.completion_tokens || 0),
+    totalTokens: (t.totalTokens || 0) + (u.total_tokens || 0),
+    cost: (t.cost || 0) + (u.cost || 0),
+  });
+  const day = colomboDate(now);
+  Object.assign(usage, add(usage));
+  usage.daily = { ...usage.daily, [day]: add(usage.daily?.[day]) };
+  return usage;
+}
+
 // Per-IP limit on API calls: true once an IP passes `limit` requests in a minute.
 const hits = new Map();
 export function overLimit(ip, now = Date.now(), limit = 120) {
@@ -126,13 +144,7 @@ async function extract(text, tt) {
   const body = await res.json();
   if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${body.error?.message || 'error'}`);
   const u = body.usage || {};
-  Object.assign(state.usage, {
-    requests: state.usage.requests + 1,
-    promptTokens: state.usage.promptTokens + (u.prompt_tokens || 0),
-    completionTokens: state.usage.completionTokens + (u.completion_tokens || 0),
-    totalTokens: state.usage.totalTokens + (u.total_tokens || 0),
-    cost: state.usage.cost + (u.cost || 0),
-  });
+  trackUsage(state.usage, u);
   const choice = body.choices?.[0];
   const content = choice?.message?.content || '';
   if (!content.includes('{')) throw new Error(`model returned no JSON (${choice?.error?.message || body.error?.message || choice?.finish_reason || 'empty reply'})`);
@@ -163,9 +175,9 @@ async function loadAll() {
 }
 
 // Saved to disk so a restart keeps rates and usage, and the chart has history to draw.
-async function save(fresh) {
+async function save(fresh, at = state.lastRefresh.at) {
   const snapshot = {
-    at: state.lastRefresh.at,
+    at,
     rates: Object.fromEntries(fresh.map(id => [id, Object.fromEntries(state.banks[id].rates.map(r => [r.currency, [r.buying, r.selling]]))])),
   };
   history.push(snapshot);
@@ -189,7 +201,28 @@ function refreshAll(trigger) {
   return state.refreshing;
 }
 
-const bankList = () => Object.entries(BANKS).map(([id, b]) => ({ id, name: b.name, url: b.url, rates: [], ...state.banks[id] }));
+// On-demand refresh of one bank (the Telegram bot's Refresh button). Data younger than maxAgeMs is reused,
+// so repeated taps never spend AI quota; concurrent taps share one fetch.
+const inflight = new Map();
+function refreshBank(id, maxAgeMs = 10 * 60_000) {
+  const b = state.banks[id];
+  if (b?.fetchedAt && !b.error && Date.now() - new Date(b.fetchedAt).getTime() < maxAgeMs) return Promise.resolve(false);
+  if (!inflight.has(id)) {
+    inflight.set(id, (async () => {
+      try {
+        state.banks[id] = await load(id);
+        await save([id], state.banks[id].fetchedAt).catch(e => console.error('could not save data:', e.message));
+        return true;
+      } catch (e) {
+        state.banks[id] = { ...state.banks[id], error: e.message };
+        throw e;
+      } finally { inflight.delete(id); }
+    })());
+  }
+  return inflight.get(id);
+}
+
+const bankList = () => Object.entries(BANKS).map(([id, b]) => ({ id, name: b.name, short: b.short, url: b.url, rates: [], ...state.banks[id] }));
 
 // No CORS header on purpose: browsers only let this app's own pages read the API.
 const SECURITY_HEADERS = {
@@ -214,9 +247,51 @@ const sameOrigin = req => {
   try { return new URL(req.headers.origin).host === req.headers.host; } catch { return false; }
 };
 
+// Optional API tokens for outside callers (agents such as Hermes, scripts). When API_TOKENS is set, the data
+// endpoints need `Authorization: Bearer <token>` unless the request comes from this app's own page.
+const API_TOKENS = (process.env.API_TOKENS || '').split(',').map(t => t.trim()).filter(Boolean);
+export function authorized(req, tokens = API_TOKENS) {
+  if (!tokens.length || sameOrigin(req)) return true;
+  const given = req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1] ?? '';
+  return tokens.some(t => t.length === given.length && timingSafeEqual(Buffer.from(t), Buffer.from(given)));
+}
+
+const OPENAPI = {
+  openapi: '3.1.0',
+  info: {
+    title: 'LKR Rates API', version: '1.0.0',
+    description: 'Telegraphic transfer buying and selling rates (LKR per 1 unit of foreign currency) from Sri Lankan banks. '
+      + 'buying = what the bank pays you; selling = what you pay the bank. Rates are indicative.',
+  },
+  components: { securitySchemes: { bearer: { type: 'http', scheme: 'bearer' } } },
+  security: [{ bearer: [] }],
+  paths: {
+    '/rates': { get: {
+      operationId: 'listRates', summary: 'Every bank with its TT rates, optionally for one currency',
+      parameters: [{ name: 'currency', in: 'query', schema: { type: 'string', example: 'USD' } }],
+      responses: { 200: { description: 'Array of banks: id, name, bankUpdatedAt (ISO, Sri Lanka time), fetchedAt, rates[{currency, buying, selling}]' } },
+    } },
+    '/rates/{bank}': { get: {
+      operationId: 'bankRates', summary: 'One bank',
+      parameters: [
+        { name: 'bank', in: 'path', required: true, schema: { type: 'string', enum: Object.keys(BANKS) } },
+        { name: 'currency', in: 'query', schema: { type: 'string' } },
+      ],
+      responses: { 200: { description: 'One bank with its rates' }, 404: { description: 'Unknown bank' } },
+    } },
+    '/banks': { get: { operationId: 'listBanks', summary: 'Supported bank ids', responses: { 200: { description: 'Array of bank ids' } } } },
+    '/api/history': { get: {
+      operationId: 'rateHistory', summary: 'Saved snapshots for one currency',
+      parameters: [{ name: 'currency', in: 'query', schema: { type: 'string', example: 'USD' } }],
+      responses: { 200: { description: 'Array of {at, rates: {bankId: [buying, selling]}}' } },
+    } },
+  },
+};
+
 const TYPES = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png',
   '.jpg': 'image/jpeg', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff',
+  '.webmanifest': 'application/manifest+json',
 };
 async function serveStatic(res, pathname) {
   let decoded;
@@ -243,12 +318,15 @@ async function handle(req, res) {
   const api = route === 'api' || route === 'rates' || route === 'banks';
   if (api && overLimit(clientIp(req))) return send(res, 429, { error: 'Too many requests, slow down' });
   if (currency && !/^[A-Z]{3}$/.test(currency)) return send(res, 400, { error: 'currency must be a 3 letter code like USD' });
+  if (url.pathname === '/openapi.json') return send(res, 200, OPENAPI);
+  if (api && !(route === 'api' && bank === 'refresh') && !authorized(req)) {
+    return send(res, 401, { error: 'Missing or invalid API token. Send Authorization: Bearer <token>' });
+  }
 
   if (route === 'api' && bank === 'status') {
     const manual = state.manual.filter(t => Date.now() - t < 3_600_000);
     return send(res, 200, {
       banks: bankList(), lastRefresh: state.lastRefresh, nextRefresh: state.nextRefresh, refreshing: !!state.refreshing,
-      usage: state.usage, models: MODELS,
       manual: { limit: MANUAL_LIMIT, remaining: MANUAL_LIMIT - manual.length, resetsAt: manual.length ? new Date(manual[0] + 3_600_000).toISOString() : null },
     });
   }
@@ -294,4 +372,11 @@ if (process.argv[1]?.endsWith('server.mjs')) {
   setTimeout(() => { scheduled(); setInterval(scheduled, REFRESH_MS); }, wait);
   const port = process.env.PORT || 3000;
   server.listen(port, process.env.HOST, () => console.log(`http://localhost:${port}`));
+  if (process.env.TELEGRAM_BOT_TOKEN) {
+    createBot({
+      token: process.env.TELEGRAM_BOT_TOKEN,
+      admins: (process.env.TELEGRAM_ADMIN_IDS || '').split(',').map(s => s.trim()).filter(Boolean),
+      getBanks: bankList, refreshBank, getUsage: () => state.usage,
+    }).start();
+  }
 }

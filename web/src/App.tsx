@@ -1,42 +1,37 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
-  Activity, AlertTriangle, ArrowDown, ArrowUp, Clock, ExternalLink, Hand, Landmark, Loader2, RefreshCw, Search, Timer,
-  TrendingDown, TrendingUp, Trophy, X,
+  AlertTriangle, ArrowDown, ArrowUp, Download, ExternalLink, Landmark, Loader2, Moon, RefreshCw, Search, Share2, Sun, X,
 } from "lucide-react"
 import { Line, LineChart, Tooltip as ChartTooltip, YAxis } from "recharts"
 import { toast } from "sonner"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer } from "@/components/ui/chart"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Input } from "@/components/ui/input"
 import { Toaster } from "@/components/ui/sonner"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { shareCard } from "@/share"
+import { Flag } from "@/flags"
 
 const REPO = "https://github.com/harindujayakody/exchnage-rates-srilanka"
 
 type Rate = { currency: string; buying: number; selling: number }
 type Bank = {
-  id: string; name: string; url: string; rates: Rate[]
-  model?: string; tokens?: number; bankUpdatedAt?: string | null; fetchedAt?: string; error?: string | null
+  id: string; name: string; short?: string; url: string; rates: Rate[]
+  bankUpdatedAt?: string | null; fetchedAt?: string; error?: string | null
 }
 type Status = {
   banks: Bank[]
   lastRefresh: { at: string; trigger: "scheduled" | "manual" } | null
   nextRefresh: string | null
   refreshing: boolean
-  models: string[]
-  usage: { requests: number; promptTokens: number; completionTokens: number; totalTokens: number; cost: number; since: string }
   manual: { limit: number; remaining: number; resetsAt: string | null }
 }
 type Snapshot = { at: string; rates: Record<string, [number, number]> }
+type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }
 
 const num = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })
-const compact = (n: number) => n.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 1 })
 const clock = (iso: string) => new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })
 
 // Server sends ISO in Sri Lanka time, or a bare date when the bank only publishes a date.
@@ -57,24 +52,27 @@ function relative(iso: string | null | undefined, now: number) {
   return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(value, unit as Intl.RelativeTimeFormatUnit)
 }
 
-type Pick = { banks: Bank[]; value: number; note: string }
+// Shown in this order when offered; the first 10 offered make the rail and the list.
+const TOP = ["USD", "EUR", "GBP", "AUD", "CAD", "JPY", "SGD", "CHF", "AED", "SAR", "INR", "CNY", "QAR", "KWD", "NZD"]
+const currencyNames = new Intl.DisplayNames(["en"], { type: "currency" })
+// CNH (offshore yuan) is not an ISO code, so browsers have no name for it.
+const currencyName = (code: string) => {
+  if (code === "CNH") return "Chinese Yuan (offshore)"
+  try { return currencyNames.of(code) ?? code } catch { return code }
+}
+const ratesFor = (banks: Bank[], code: string) => banks.map((bank) => ({ bank, rate: bank.rates.find((r) => r.currency === code) }))
+const shortName = (b: Bank) => b.short ?? b.name
+
+type Pick = { banks: Bank[]; value: number }
 function bestOf(rows: { bank: Bank; rate?: Rate }[]) {
   const offered = rows.flatMap(({ bank, rate }) => (rate ? [{ bank, rate, spread: rate.selling - rate.buying }] : []))
   if (!offered.length) return null
-  const pick = (score: (o: (typeof offered)[number]) => number, better: "max" | "min") => {
+  const pick = (score: (o: (typeof offered)[number]) => number, better: "max" | "min"): Pick => {
     const scores = offered.map(score)
     const value = better === "max" ? Math.max(...scores) : Math.min(...scores)
-    const worst = better === "max" ? Math.min(...scores) : Math.max(...scores)
-    return { banks: offered.filter((o) => score(o) === value).map((o) => o.bank), value, worst }
+    return { banks: offered.filter((o) => score(o) === value).map((o) => o.bank), value }
   }
-  const buy = pick((o) => o.rate.buying, "max")
-  const sell = pick((o) => o.rate.selling, "min")
-  const spread = pick((o) => o.spread, "min")
-  return {
-    buying: { ...buy, note: `${num(buy.value - buy.worst)} more than the lowest` },
-    selling: { ...sell, note: `${num(sell.worst - sell.value)} less than the highest` },
-    spread: { ...spread, note: "Selling minus buying" },
-  }
+  return { buying: pick((o) => o.rate.buying, "max"), selling: pick((o) => o.rate.selling, "min"), spread: pick((o) => o.spread, "min"), count: offered.length }
 }
 
 const RANGES = [
@@ -82,14 +80,15 @@ const RANGES = [
   { label: "6M", ms: 182 * 86_400_000 }, { label: "1Y", ms: 365 * 86_400_000 }, { label: "Max", ms: Infinity },
 ]
 
-// One value per snapshot: a single bank's rate, or the best across banks (highest buying, lowest selling).
+// One point per snapshot: a single bank's rate, or the best across banks with the bank that held it.
 function seriesFrom(history: Snapshot[], bankId: string, side: "buying" | "selling", since: number) {
   const i = side === "buying" ? 0 : 1
   return history.flatMap((h) => {
     if (new Date(h.at).getTime() < since) return []
-    const values = bankId === "best" ? Object.values(h.rates).map((r) => r[i]) : h.rates[bankId] ? [h.rates[bankId][i]] : []
-    if (!values.length) return []
-    return [{ at: h.at, value: side === "buying" ? Math.max(...values) : Math.min(...values) }]
+    const entries = Object.entries(h.rates).filter(([id]) => bankId === "best" || id === bankId)
+    if (!entries.length) return []
+    const [id, r] = entries.reduce((a, b) => ((side === "buying" ? b[1][i] > a[1][i] : b[1][i] < a[1][i]) ? b : a))
+    return [{ at: h.at, value: r[i], bankId: id }]
   })
 }
 
@@ -100,6 +99,8 @@ export default function App() {
   const [manualRunning, setManualRunning] = useState(false)
   const [currency, setCurrency] = useState("USD")
   const [now, setNow] = useState(Date.now())
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"))
+  const [install, setInstall] = useState<InstallPrompt | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -126,6 +127,27 @@ export default function App() {
     fetch(`/api/history?currency=${currency}`).then((r) => (r.ok ? r.json() : [])).then(setHistory).catch(() => setHistory([]))
   }, [currency, lastAt])
 
+  useEffect(() => {
+    const onPrompt = (e: Event) => { e.preventDefault(); setInstall(e as InstallPrompt) }
+    const onInstalled = () => { setInstall(null); toast.success("LKR Rates is installed") }
+    window.addEventListener("beforeinstallprompt", onPrompt)
+    window.addEventListener("appinstalled", onInstalled)
+    return () => { window.removeEventListener("beforeinstallprompt", onPrompt); window.removeEventListener("appinstalled", onInstalled) }
+  }, [])
+
+  async function installApp() {
+    if (!install) return
+    await install.prompt()
+    if ((await install.userChoice).outcome === "accepted") setInstall(null)
+  }
+
+  function toggleTheme() {
+    const next = !dark
+    setDark(next)
+    document.documentElement.classList.toggle("dark", next)
+    try { localStorage.setItem("theme", next ? "dark" : "light") } catch { /* private mode: theme just won't persist */ }
+  }
+
   async function refresh() {
     setManualRunning(true)
     const id = toast.loading("Fetching the latest rates from all banks…")
@@ -135,7 +157,7 @@ export default function App() {
       if (res.ok) toast.success("Rates updated", { id })
       else toast.error(body.error ?? "Refresh failed", { id })
     } catch {
-      toast.error("Could not reach the server", { id })
+      toast.error("Could not reach the server. Check your connection and try again.", { id })
     }
     setManualRunning(false)
     load()
@@ -143,158 +165,309 @@ export default function App() {
 
   const currencies = useMemo(() => {
     const all = new Set(status?.banks.flatMap((b) => b.rates.map((r) => r.currency)))
-    return ["USD", "EUR", "GBP", ...[...all].sort()].filter((c, i, a) => all.has(c) && a.indexOf(c) === i)
+    return { top: TOP.filter((c) => all.has(c)).slice(0, 10), all: [...all].sort() }
   }, [status])
-
-  const rows = useMemo(
-    () => (status?.banks ?? []).map((bank) => ({ bank, rate: bank.rates.find((r) => r.currency === currency) })),
-    [status, currency],
-  )
-  const top = useMemo(() => bestOf(rows), [rows])
   const manualLeft = status?.manual.remaining ?? 0
 
   return (
     <TooltipProvider>
       <div className="flex min-h-svh flex-col bg-background text-foreground">
-        <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
+        <header className="sticky top-0 z-40 border-b-2 border-foreground bg-background">
           <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
-            <a href="/" className="flex items-center gap-2.5" aria-label="LKR Rates home">
-              <Mark />
-              <span className="font-heading text-lg font-semibold tracking-tight">LKR Rates</span>
-              <Badge variant="outline" className="hidden font-mono text-[10px] sm:inline-flex">TT</Badge>
+            <a href="/" className="flex items-center gap-2.5 rounded-md" aria-label="LKR Rates home">
+              <img src="/logo.png" alt="" width={32} height={32} className="size-8" />
+              <span className="font-heading text-xl font-bold tracking-tight">LKR Rates</span>
             </a>
-            <div className="flex items-center gap-1.5">
-              <UsageButton status={status} />
+            <div className="flex items-center gap-1">
+              {install && (
+                <button onClick={installApp} aria-label="Install app"
+                  className="inline-flex h-10 items-center gap-2 rounded-md px-2.5 text-sm font-semibold transition-colors hover:bg-muted">
+                  <Download className="size-[18px]" aria-hidden /><span className="hidden sm:inline">Install</span>
+                </button>
+              )}
+              <Tooltip>
+                <TooltipTrigger render={<button onClick={toggleTheme} aria-label={dark ? "Switch to light theme" : "Switch to dark theme"} />}
+                  className="inline-flex size-10 items-center justify-center rounded-md transition-colors hover:bg-muted">
+                  {dark ? <Sun className="size-[18px]" aria-hidden /> : <Moon className="size-[18px]" aria-hidden />}
+                </TooltipTrigger>
+                <TooltipContent>{dark ? "Light theme" : "Dark theme"}</TooltipContent>
+              </Tooltip>
               <Tooltip>
                 <TooltipTrigger render={<a href={REPO} target="_blank" rel="noreferrer" aria-label="Source code on GitHub" />}
-                  className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                  className="inline-flex size-10 items-center justify-center rounded-md transition-colors hover:bg-muted">
                   <GitHubIcon className="size-[18px]" />
                 </TooltipTrigger>
                 <TooltipContent>Source on GitHub</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger render={<span />} className="ml-1 inline-flex">
-                  <Button onClick={refresh} disabled={!status || busy || manualLeft === 0} size="sm">
-                    {busy ? <Loader2 className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />}
-                    <span className="hidden sm:inline">{busy ? "Updating…" : "Refresh"}</span>
-                    <span className="font-mono text-xs opacity-60">{manualLeft}/{status?.manual.limit ?? 2}</span>
-                  </Button>
+                  <button onClick={refresh} disabled={!status || busy || manualLeft === 0} aria-label={busy ? "Updating rates" : "Refresh rates"}
+                    className="inline-flex h-10 items-center gap-2 rounded-md bg-foreground px-3.5 text-sm font-semibold text-background transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40">
+                    {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />}
+                    <span className="hidden sm:inline">{busy ? "Updating" : "Refresh"}</span>
+                    <span className="font-mono text-xs opacity-70">{manualLeft}/{status?.manual.limit ?? 2}</span>
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent>
                   {manualLeft === 0 && status?.manual.resetsAt
                     ? `Manual limit reached. Next refresh ${relative(status.manual.resetsAt, now)}.`
-                    : `${manualLeft} of ${status?.manual.limit ?? 2} manual refreshes left this hour`}
+                    : `${manualLeft} of ${status?.manual.limit ?? 2} manual refreshes left this hour. Rates also update every 3 hours.`}
                 </TooltipContent>
               </Tooltip>
             </div>
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+        <main className="mx-auto w-full max-w-6xl flex-1 space-y-10 px-4 py-6 sm:px-6 sm:py-8">
           {loadError && (
-            <div role="alert" className="flex items-center gap-2 rounded-lg border border-down/40 bg-down/10 px-4 py-3 text-sm">
+            <div role="alert" className="flex items-center gap-2 rounded-md border-2 border-down px-4 py-3 text-sm font-medium">
               <AlertTriangle className="size-4 text-down" aria-hidden /> Can't reach the rates server. Retrying automatically.
             </div>
           )}
 
-          <RateChart status={status} history={history} currency={currency} currencies={currencies} onCurrency={setCurrency} />
+          <div className="space-y-4">
+            <CurrencyRail top={currencies.top} all={currencies.all} currency={currency} onPick={setCurrency} />
+            <Slab status={status} history={history} currency={currency} now={now} />
+          </div>
 
-          <section className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Update status">
-            <Stat icon={Clock} label="Last update" loading={!status}
-              value={status?.lastRefresh ? relative(status.lastRefresh.at, now) : status?.refreshing ? "Running…" : "—"}
-              hint={status?.lastRefresh ? `${clock(status.lastRefresh.at)} · ${status.lastRefresh.trigger === "manual" ? "Manual" : "Auto"}` : "First fetch in progress"} />
-            <Stat icon={Timer} label="Next auto update" loading={!status}
-              value={relative(status?.nextRefresh, now)}
-              hint={status?.nextRefresh ? `${clock(status.nextRefresh)} · every 3 hours` : "Every 3 hours"} />
-            <Stat icon={Hand} label="Manual refreshes" loading={!status}
-              value={`${manualLeft} of ${status?.manual.limit ?? 2} left`}
-              hint={status?.manual.resetsAt ? `Next slot ${relative(status.manual.resetsAt, now)}` : "Limit 2 per hour"} />
-          </section>
-
-          <section className="space-y-3" aria-label={`Best ${currency} rates today`}>
-            <div>
-              <h2 className="text-base font-semibold tracking-tight">Best {currency} rates today</h2>
-              <p className="text-sm text-muted-foreground">Telegraphic transfer rates across {status?.banks.length ?? 9} banks</p>
-            </div>
-            <div className="grid gap-3 md:grid-cols-3">
-              <BestCard icon={TrendingUp} label={`Best to sell ${currency}`} help="Highest buying rate. The bank pays you the most." pick={top?.buying} loading={!status} />
-              <BestCard icon={TrendingDown} label={`Best to buy ${currency}`} help="Lowest selling rate. You pay the bank the least." pick={top?.selling} loading={!status} />
-              <BestCard icon={Trophy} label="Overall best" help="The smallest spread is the fairest rate both ways." pick={top?.spread} loading={!status} highlight />
-            </div>
-          </section>
-
-          <TopCurrencies status={status} currency={currency} onPick={setCurrency} />
+          <TopCurrencies status={status} codes={currencies.top} currency={currency} onPick={setCurrency} />
 
           <Explore status={status} currency={currency} onPick={setCurrency} now={now} />
         </main>
 
-        <Footer banks={status?.banks ?? []} />
+        <Footer banks={status?.banks ?? []} canInstall={!!install} onInstall={installApp} />
       </div>
-      <Toaster theme="dark" position="bottom-right" />
+      <Toaster theme={dark ? "dark" : "light"} position="bottom-center" />
     </TooltipProvider>
   )
 }
 
-// Shown in this order when offered; the first 10 a bank offers make the grid.
-const TOP = ["USD", "EUR", "GBP", "AUD", "CAD", "JPY", "SGD", "CHF", "AED", "SAR", "INR", "CNY", "QAR", "KWD", "NZD"]
-const currencyNames = new Intl.DisplayNames(["en"], { type: "currency" })
-const currencyName = (code: string) => { try { return currencyNames.of(code) ?? code } catch { return code } }
-const ratesFor = (banks: Bank[], code: string) => banks.map((bank) => ({ bank, rate: bank.rates.find((r) => r.currency === code) }))
-
-function SectionTitle({ title, hint, children }: { title: string; hint: string; children?: React.ReactNode }) {
+function CurrencyRail({ top, all, currency, onPick }: { top: string[]; all: string[]; currency: string; onPick: (c: string) => void }) {
+  const chip = (active: boolean) =>
+    `h-9 shrink-0 rounded-md border-2 border-foreground px-2.5 font-mono text-sm font-semibold transition-colors ${active ? "bg-foreground text-background" : "hover:bg-muted"}`
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
+    <nav aria-label="Currency" className="-mx-4 flex items-center gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0">
+      {(top.length ? top : ["USD"]).map((c) => (
+        <button key={c} onClick={() => onPick(c)} aria-pressed={c === currency} className={`inline-flex items-center gap-2 ${chip(c === currency)}`} title={currencyName(c)}>
+          <Flag code={c} />{c}
+        </button>
+      ))}
+      <Select value={top.includes(currency) ? "" : currency} onValueChange={(v) => v && onPick(v)}>
+        <SelectTrigger aria-label="More currencies"
+          className={`h-9! shrink-0 rounded-md border-2 border-foreground font-mono text-sm font-semibold data-placeholder:text-foreground ${top.includes(currency) ? "" : "bg-foreground text-background"}`}>
+          <SelectValue placeholder="More">{(v: string) => v || "More"}</SelectValue>
+        </SelectTrigger>
+        <SelectContent align="end" alignItemWithTrigger={false} className="w-72 max-w-[calc(100vw-2rem)]">
+          {all.map((c) => <SelectItem key={c} value={c}><Flag code={c} /><span className="font-mono font-semibold">{c}</span> <span className="text-muted-foreground">{currencyName(c)}</span></SelectItem>)}
+        </SelectContent>
+      </Select>
+    </nav>
+  )
+}
+
+function Slab({ status, history, currency, now }: { status: Status | null; history: Snapshot[]; currency: string; now: number }) {
+  const [bankId, setBankId] = useState("best")
+  const [side, setSide] = useState<"buying" | "selling">("buying")
+  const [range, setRange] = useState("1W")
+  const [hover, setHover] = useState<number | null>(null)
+  const [sharing, setSharing] = useState(false)
+
+  const banks = status?.banks ?? []
+  const rows = ratesFor(banks, currency)
+  const top = bestOf(rows)
+  const since = Date.now() - (RANGES.find((r) => r.label === range)?.ms ?? Infinity)
+  const data = useMemo(() => seriesFrom(history, bankId, side, since), [history, bankId, side, since])
+
+  // Live value from the latest rates; a hovered chart point replaces it.
+  const liveBank = bankId === "best" ? top?.[side].banks[0] : banks.find((b) => b.id === bankId)
+  const liveValue = bankId === "best" ? top?.[side].value : liveBank?.rates.find((r) => r.currency === currency)?.[side]
+  const point = hover != null ? data[hover] : null
+  const shownBank = point ? banks.find((b) => b.id === point.bankId) : liveBank
+  const shownValue = point?.value ?? liveValue
+  const shownAt = point?.at ?? shownBank?.fetchedAt ?? status?.lastRefresh?.at
+  const first = data[0]
+  const change = shownValue != null && first && data.length > 1 ? shownValue - first.value : null
+  // For the customer, a higher buying rate or a lower selling rate is the good direction.
+  const good = change != null && (side === "buying" ? change >= 0 : change <= 0)
+  const name = shownBank?.name ?? "No bank"
+  // The bank is the headline; what the number means sits under the rate.
+  const meaning = bankId === "best"
+    ? side === "buying" ? "Highest buying rate" : "Lowest selling rate"
+    : side === "buying" ? "Buying rate" : "Selling rate"
+  const [whole, decimals] = shownValue != null ? num(shownValue).split(".") : ["—", ""]
+  const values = data.map((d) => d.value)
+
+  async function share() {
+    if (shownValue == null) return
+    setSharing(true)
+    try {
+      const result = await shareCard({
+        currency, currencyName: currencyName(currency), bank: name, meaning, value: shownValue,
+        change: change != null && first ? { abs: change, pct: (change / first.value) * 100, good, range } : undefined,
+        series: values,
+        rows: rows.flatMap(({ bank, rate }) => (rate ? [{ name: bank.name, buying: rate.buying, selling: rate.selling }] : []))
+          .sort((a, b) => b.buying - a.buying),
+        at: shownAt ?? new Date().toISOString(),
+      })
+      if (result === "saved") toast.success("Image saved to your downloads")
+    } catch {
+      toast.error("Couldn't create the image. Try again.")
+    }
+    setSharing(false)
+  }
+
+  const seg = (active: boolean, pad = "px-3") => `rounded ${pad} py-1.5 text-xs font-semibold transition-colors ${active ? "bg-background text-foreground" : "text-background/70 hover:text-background"}`
+
+  return (
+    <section aria-label={`${currency} best rate`} className="grid grid-cols-1 overflow-hidden rounded-md bg-foreground text-background lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <div className="flex flex-col gap-6 p-5 sm:p-8">
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={bankId} onValueChange={(v) => v && setBankId(v)}>
+            <SelectTrigger size="sm" aria-label="Bank" className="w-48 border-background/30 bg-transparent text-background dark:bg-transparent [&_svg]:text-background/70!">
+              <SelectValue>{(v: string) => (v === "best" ? "Best across banks" : banks.find((b) => b.id === v)?.name ?? v)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="best">Best across banks</SelectItem>
+              {banks.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <div className="inline-flex rounded-md border border-background/30 p-0.5" role="group" aria-label="Rate side">
+            {(["buying", "selling"] as const).map((s) => (
+              <button key={s} onClick={() => setSide(s)} aria-pressed={side === s} className={`capitalize ${seg(side === s)}`}>{s}</button>
+            ))}
+          </div>
+        </div>
+
+        {!status ? (
+          <div className="space-y-3"><Skeleton className="h-9 w-4/5 bg-background/15" /><Skeleton className="h-20 w-3/5 bg-background/15" /></div>
+        ) : (
+          <div key={`${currency}-${bankId}-${side}`} className="slab-wipe" aria-live="polite">
+            <h1 className="font-heading text-3xl leading-tight font-extrabold tracking-tight text-balance sm:text-[2.75rem]">{name}</h1>
+            <p className="mt-4 flex items-baseline gap-2 font-mono leading-none">
+              <span className="text-2xl font-medium text-background/60 sm:text-3xl">Rs</span>
+              <span className="text-6xl font-bold tracking-[-0.04em] sm:text-7xl lg:text-8xl">{whole}{decimals && <span className="text-3xl font-semibold text-background/60 sm:text-4xl">.{decimals}</span>}</span>
+            </p>
+            <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-background/70">
+              {change != null && (
+                <span className={`inline-flex items-center gap-1 font-mono font-semibold ${change === 0 ? "" : good ? "text-slab-up" : "text-slab-down"}`}>
+                  {change > 0 ? <ArrowUp className="size-3.5" aria-hidden /> : change < 0 ? <ArrowDown className="size-3.5" aria-hidden /> : null}
+                  {change >= 0 ? "+" : ""}{num(change)} ({change >= 0 ? "+" : ""}{first ? ((change / first.value) * 100).toFixed(2) : "0.00"}%) {range}
+                </span>
+              )}
+              <span><span className="font-semibold text-background">{meaning}</span> · for 1 {currency} · {shownAt ? clock(shownAt) : "no data yet"}</span>
+            </p>
+          </div>
+        )}
+
+        {top && (
+          <dl className="divide-y divide-background/15 border-y border-background/15 text-sm">
+            <SlabRow label={side === "buying" ? "Lowest selling" : "Highest buying"}
+              value={num(side === "buying" ? top.selling.value : top.buying.value)}
+              bank={shortName(side === "buying" ? top.selling.banks[0] : top.buying.banks[0])} />
+            <SlabRow label="Smallest spread" value={num(top.spread.value)} bank={shortName(top.spread.banks[0])} />
+            <SlabRow label={`Banks quoting ${currency}`} value={String(top.count)} />
+          </dl>
+        )}
+
+        <p className="mt-auto text-xs text-background/60">
+          Updated {relative(status?.lastRefresh?.at, now)} · next update {relative(status?.nextRefresh, now)} · TT rates, LKR per 1 unit
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-4 border-t border-background/15 p-5 sm:p-8 lg:border-t-0 lg:border-l">
+        <div className="min-h-56 flex-1 sm:min-h-72">
+          {data.length < 2 ? (
+            <div className="flex h-full min-h-56 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-background/25 px-6 text-center text-sm text-background/70 sm:min-h-72">
+              <p className="font-medium text-background">The history line starts here.</p>
+              <p>A point is added every 3 hours. {data.length === 1 ? "One so far in this range." : "None in this range yet."}</p>
+            </div>
+          ) : (
+            <ChartContainer config={{ value: { label: side, color: "var(--background)" } }}
+              className="aspect-auto h-full min-h-56 w-full sm:min-h-72 [&_.recharts-cartesian-axis-tick_text]:fill-background/60">
+              <LineChart data={data} margin={{ top: 8, right: 4, bottom: 8, left: 4 }}
+                onMouseMove={(s) => setHover(s?.activeTooltipIndex != null ? Number(s.activeTooltipIndex) : null)}
+                onMouseLeave={() => setHover(null)}>
+                <YAxis orientation="right" ticks={[Math.min(...values), Math.max(...values)]}
+                  domain={[(min: number) => min - (Math.max(...values) - min) * 0.08 - 0.01, (max: number) => max + (max - Math.min(...values)) * 0.08 + 0.01]}
+                  tickFormatter={(v: number) => num(v)} axisLine={false} tickLine={false} width={64}
+                  tick={{ fontFamily: "var(--font-mono)", fontSize: 11 }} />
+                <ChartTooltip cursor={{ stroke: "var(--background)", strokeOpacity: 0.5, strokeWidth: 1 }} content={() => null} />
+                <Line dataKey="value" type="monotone" stroke="var(--background)" strokeWidth={2.5} dot={false}
+                  activeDot={{ r: 5, fill: "var(--background)", stroke: "var(--foreground)", strokeWidth: 2 }} isAnimationActive={false} />
+              </LineChart>
+            </ChartContainer>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex flex-1 items-center gap-1 rounded-md border border-background/30 p-0.5" role="group" aria-label="Chart range">
+            {RANGES.map((r) => (
+              <button key={r.label} onClick={() => setRange(r.label)} aria-pressed={range === r.label} className={`flex-1 font-mono ${seg(range === r.label, "px-0 sm:px-3")}`}>{r.label}</button>
+            ))}
+          </div>
+          <button onClick={share} disabled={shownValue == null || sharing}
+            className="inline-flex h-9 items-center gap-2 rounded-md bg-background px-3.5 text-sm font-semibold text-foreground transition-opacity hover:opacity-85 disabled:opacity-40">
+            {sharing ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Share2 className="size-4" aria-hidden />}
+            Share
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function SlabRow({ label, value, bank }: { label: string; value: string; bank?: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 py-2.5">
+      <dt className="text-background/70">{label}</dt>
+      <dd className="flex items-baseline gap-2">
+        <span className="font-mono font-semibold">{value}</span>
+        {bank && <span className="text-background/70">{bank}</span>}
+      </dd>
+    </div>
+  )
+}
+
+function SectionHead({ title, hint, children }: { title: string; hint: string; children?: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-4 border-b-2 border-foreground pb-3">
       <div>
-        <h2 className="text-base font-semibold tracking-tight">{title}</h2>
-        <p className="text-sm text-muted-foreground">{hint}</p>
+        <h2 className="font-heading text-2xl font-bold tracking-tight">{title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
       </div>
       {children}
     </div>
   )
 }
 
-function TopCurrencies({ status, currency, onPick }: { status: Status | null; currency: string; onPick: (c: string) => void }) {
+function TopCurrencies({ status, codes, currency, onPick }: { status: Status | null; codes: string[]; currency: string; onPick: (c: string) => void }) {
   const banks = status?.banks ?? []
-  const codes = TOP.filter((c) => banks.some((b) => b.rates.some((r) => r.currency === c))).slice(0, 10)
   return (
-    <section className="space-y-3" aria-label="Top currencies">
-      <SectionTitle title="Top currencies" hint="Best telegraphic transfer rate for each, across every bank. Tap one to chart it." />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <section aria-label="Top currencies">
+      <SectionHead title="Top currencies" hint="The bank paying the most and charging the least for each. Tap one to show it at the top." />
+      <div className="grid lg:grid-cols-2 lg:gap-x-10">
         {!status
-          ? Array.from({ length: 10 }, (_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)
+          ? Array.from({ length: 10 }, (_, i) => <Skeleton key={i} className="my-2 h-12" />)
           : codes.map((code) => {
-              const rows = ratesFor(banks, code)
-              const top = bestOf(rows)
-              const count = rows.filter((r) => r.rate).length
+              const top = bestOf(ratesFor(banks, code))
               const active = code === currency
               return (
-                <button key={code} onClick={() => { onPick(code); window.scrollTo({ top: 0, behavior: "smooth" }) }}
-                  aria-pressed={active}
-                  className={`group flex flex-col gap-3 rounded-xl border bg-card p-3.5 text-left transition-all hover:-translate-y-0.5 hover:border-foreground/25 focus-visible:outline-2 focus-visible:outline-up ${active ? "border-up/60 ring-1 ring-up/40" : ""}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="font-mono text-lg font-semibold leading-none">{code}</div>
-                      <div className="mt-1 truncate text-xs text-muted-foreground">{currencyName(code)}</div>
-                    </div>
-                    <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">{count} banks</span>
-                  </div>
+                <button key={code} onClick={() => { onPick(code); window.scrollTo({ top: 0, behavior: "smooth" }) }} aria-pressed={active}
+                  className={`grid grid-cols-[4.75rem_minmax(0,1fr)_auto] items-center gap-3 border-b px-2 py-3 text-left transition-colors ${active ? "bg-foreground text-background" : "hover:bg-muted"}`}>
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2 font-mono text-lg leading-none font-bold"><Flag code={code} />{code}</span>
+                    <span className={`mt-1 block truncate text-xs ${active ? "text-background/70" : "text-muted-foreground"}`}>{currencyName(code)}</span>
+                  </span>
                   {top && (
-                    <dl className="space-y-1.5 text-xs">
-                      <div>
-                        <dt className="text-muted-foreground">Best buying</dt>
-                        <dd className="flex items-baseline justify-between gap-2">
-                          <span className="font-mono text-sm font-semibold text-up tabular-nums">{num(top.buying.value)}</span>
-                          <span className="truncate text-muted-foreground">{top.buying.banks[0].name.replace(/ Bank$/, "")}</span>
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted-foreground">Best selling</dt>
-                        <dd className="flex items-baseline justify-between gap-2">
-                          <span className="font-mono text-sm font-semibold tabular-nums">{num(top.selling.value)}</span>
-                          <span className="truncate text-muted-foreground">{top.selling.banks[0].name.replace(/ Bank$/, "")}</span>
-                        </dd>
-                      </div>
-                    </dl>
+                    <span className={`truncate text-xs ${active ? "text-background/70" : "text-muted-foreground"}`}>
+                      <span className={`font-medium ${active ? "text-background" : "text-foreground"}`}>{shortName(top.buying.banks[0])}</span> pays most
+                      <span className="hidden sm:inline"> · <span className={`font-medium ${active ? "text-background" : "text-foreground"}`}>{shortName(top.selling.banks[0])}</span> charges least</span>
+                    </span>
+                  )}
+                  {top && (
+                    <span className="text-right font-mono leading-tight">
+                      <span className="block font-bold">{num(top.buying.value)}</span>
+                      <span className={`block text-xs ${active ? "text-background/70" : "text-muted-foreground"}`}>{num(top.selling.value)}</span>
+                    </span>
                   )}
                 </button>
               )
@@ -312,81 +485,72 @@ function Explore({ status, currency, onPick, now }: { status: Status | null; cur
   const allCodes = [...new Set(banks.flatMap((b) => b.rates.map((r) => r.currency)))].sort()
   const codeHits = q ? allCodes.filter((c) => c.toLowerCase().includes(q) || currencyName(c).toLowerCase().includes(q)) : []
   const bankHits = q ? banks.filter((b) => b.name.toLowerCase().includes(q) || b.id.includes(q)) : []
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
   return (
-    <section className="space-y-3" aria-label="Explore rates">
-      <SectionTitle title="Explore rates" hint={q ? `${codeHits.length} ${codeHits.length === 1 ? "currency" : "currencies"} and ${bankHits.length} ${bankHits.length === 1 ? "bank" : "banks"} match` : `${currency} at every bank. Search to see a bank's full list or another currency.`}>
+    <section aria-label="Every bank" className="space-y-4">
+      <SectionHead title={q ? "Search results" : `${currency} at every bank`}
+        hint={q ? `${plural(codeHits.length, "currency", "currencies")} and ${plural(bankHits.length, "bank", "banks")} match` : "Buying: what the bank pays you. Selling: what you pay the bank."}>
         <div className="relative w-full sm:w-80">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search a bank or currency, e.g. Sampath, EUR, yen"
-            aria-label="Search banks and currencies" className="h-10 pr-9 pl-9" />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search a bank or currency"
+            aria-label="Search banks and currencies" className="h-10 border-2 border-foreground pr-9 pl-9" />
           {query && (
             <button onClick={() => setQuery("")} aria-label="Clear search"
-              className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+              className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
               <X className="size-4" />
             </button>
           )}
         </div>
-      </SectionTitle>
+      </SectionHead>
 
       {!q ? (
         <CompareTable status={status} currency={currency} />
       ) : !codeHits.length && !bankHits.length ? (
-        <div className="flex flex-col items-center gap-1 rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
-          <Search className="size-5" aria-hidden />
-          <p>Nothing matches “{query}”.</p>
-          <p className="text-xs">Try a bank name like “Seylan” or a currency like “AUD”.</p>
+        <div className="py-12 text-center text-sm text-muted-foreground">
+          <p className="font-medium text-foreground">Nothing matches “{query}”.</p>
+          <p className="mt-1">Try a bank like “Seylan” or a currency like “AUD” or “yen”.</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-8">
           {codeHits.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-heading">Currencies</CardTitle>
-                <CardDescription>Best rate for each across all banks. Select one to compare every bank.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Currency</TableHead>
-                      <TableHead className="text-right">Best buying</TableHead>
-                      <TableHead className="text-right">Best selling</TableHead>
-                      <TableHead className="hidden text-right sm:table-cell">Banks</TableHead>
+            <Table>
+              <TableHeader className="[&_tr]:border-b-2 [&_tr]:border-foreground">
+                <TableRow>
+                  <TableHead>Currency</TableHead>
+                  <TableHead className="text-right">Pays most</TableHead>
+                  <TableHead className="text-right">Charges least</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {codeHits.map((code) => {
+                  const top = bestOf(ratesFor(banks, code))
+                  const pick = () => { onPick(code); setQuery(""); window.scrollTo({ top: 0, behavior: "smooth" }) }
+                  return (
+                    <TableRow key={code} className="cursor-pointer" onClick={pick}>
+                      <TableCell>
+                        <button className="text-left" onClick={(e) => { e.stopPropagation(); pick() }}>
+                          <span className="inline-flex items-center gap-2 font-mono font-bold"><Flag code={code} />{code}</span>
+                          <span className="ml-2 text-muted-foreground">{currencyName(code)}</span>
+                        </button>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="font-mono font-semibold">{top ? num(top.buying.value) : "—"}</div>
+                        <div className="text-xs text-muted-foreground">{top && shortName(top.buying.banks[0])}</div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="font-mono font-semibold">{top ? num(top.selling.value) : "—"}</div>
+                        <div className="text-xs text-muted-foreground">{top && shortName(top.selling.banks[0])}</div>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {codeHits.map((code) => {
-                      const rows = ratesFor(banks, code)
-                      const top = bestOf(rows)
-                      return (
-                        <TableRow key={code} className="cursor-pointer" onClick={() => { onPick(code); setQuery("") }}>
-                          <TableCell>
-                            <button className="text-left" onClick={(e) => { e.stopPropagation(); onPick(code); setQuery("") }}>
-                              <span className="font-mono font-semibold">{code}</span>
-                              <span className="ml-2 text-muted-foreground">{currencyName(code)}</span>
-                            </button>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="font-mono text-up tabular-nums">{top ? num(top.buying.value) : "—"}</div>
-                            <div className="text-xs text-muted-foreground">{top?.buying.banks[0].name}</div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="font-mono tabular-nums">{top ? num(top.selling.value) : "—"}</div>
-                            <div className="text-xs text-muted-foreground">{top?.selling.banks[0].name}</div>
-                          </TableCell>
-                          <TableCell className="hidden text-right font-mono text-muted-foreground sm:table-cell">{rows.filter((r) => r.rate).length}</TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                  )
+                })}
+              </TableBody>
+            </Table>
           )}
           {bankHits.length > 0 && (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {bankHits.map((bank) => <BankCard key={bank.id} bank={bank} now={now} />)}
+            <div className="grid gap-x-10 gap-y-8 md:grid-cols-2">
+              {bankHits.map((bank) => <BankSheet key={bank.id} bank={bank} now={now} />)}
             </div>
           )}
         </div>
@@ -396,302 +560,145 @@ function Explore({ status, currency, onPick, now }: { status: Status | null; cur
 }
 
 function CompareTable({ status, currency }: { status: Status | null; currency: string }) {
-  const rows = ratesFor(status?.banks ?? [], currency)
+  const rows = ratesFor(status?.banks ?? [], currency).sort((a, b) => (b.rate?.buying ?? -1) - (a.rate?.buying ?? -1))
   const top = bestOf(rows)
+  if (!status) return <div className="space-y-3">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="font-heading">{currency} to LKR</CardTitle>
-        <CardDescription>Buying: what the bank pays you. Selling: what you pay the bank.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {!status ? <TableSkeleton /> : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Bank</TableHead>
-                <TableHead className="text-right">Buying</TableHead>
-                <TableHead className="text-right">Selling</TableHead>
-                <TableHead className="hidden text-right md:table-cell">Spread</TableHead>
-                <TableHead className="hidden sm:table-cell">Bank updated</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map(({ bank, rate }) => (
-                <TableRow key={bank.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2.5 font-medium">
-                      <span className="hidden sm:contents"><BankLogo bank={bank} /></span>
-                      {bank.name}
-                      <BankState bank={bank} />
-                    </div>
-                  </TableCell>
-                  {rate ? (
-                    <>
-                      <RateCell value={rate.buying} best={rate.buying === top?.buying.value} />
-                      <RateCell value={rate.selling} best={rate.selling === top?.selling.value} />
-                      <TableCell className="hidden text-right font-mono tabular-nums text-muted-foreground md:table-cell">
-                        {num(rate.selling - rate.buying)}
-                      </TableCell>
-                    </>
-                  ) : (
-                    <TableCell colSpan={3} className="text-right text-muted-foreground">
-                      {bank.fetchedAt || bank.error ? "Not offered" : "Loading…"}
-                    </TableCell>
-                  )}
-                  <TableCell className="hidden text-muted-foreground sm:table-cell">{bankClock(bank.bankUpdatedAt)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-function BankCard({ bank, now }: { bank: Bank; now: number }) {
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2.5 font-heading"><BankLogo bank={bank} /> {bank.name} <BankState bank={bank} /></CardTitle>
-          <a href={bank.url} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground"
-            aria-label={`Open ${bank.name} rates page`}>
-            <ExternalLink className="size-4" />
-          </a>
-        </div>
-        <CardDescription className="space-y-0.5">
-          <span className="block">Bank updated: {bankClock(bank.bankUpdatedAt)}</span>
-          <span className="block">Fetched {relative(bank.fetchedAt, now)}</span>
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {bank.rates.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{bank.error ?? "Loading…"}</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Currency</TableHead>
-                <TableHead className="text-right">Buying</TableHead>
-                <TableHead className="text-right">Selling</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {bank.rates.map((r) => (
-                <TableRow key={r.currency}>
-                  <TableCell className="font-mono font-medium" title={currencyName(r.currency)}>{r.currency}</TableCell>
-                  <TableCell className="text-right font-mono tabular-nums">{num(r.buying)}</TableCell>
-                  <TableCell className="text-right font-mono tabular-nums">{num(r.selling)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-function RateChart({ status, history, currency, currencies, onCurrency }: {
-  status: Status | null; history: Snapshot[]; currency: string; currencies: string[]; onCurrency: (c: string) => void
-}) {
-  const [bankId, setBankId] = useState("best")
-  const [side, setSide] = useState<"buying" | "selling">("buying")
-  const [range, setRange] = useState("1W")
-  const [hover, setHover] = useState<number | null>(null)
-
-  const since = Date.now() - (RANGES.find((r) => r.label === range)?.ms ?? Infinity)
-  const data = useMemo(() => seriesFrom(history, bankId, side, since), [history, bankId, side, since])
-  const shown = data[hover ?? data.length - 1]
-  const first = data[0]
-  const change = shown && first ? shown.value - first.value : 0
-  // For the customer, a higher buying rate or a lower selling rate is the good direction.
-  const good = side === "buying" ? change >= 0 : change <= 0
-  const tone = change === 0 ? "text-muted-foreground" : good ? "text-up" : "text-down"
-  const stroke = change === 0 ? "var(--muted-foreground)" : good ? "var(--up)" : "var(--down)"
-  const values = data.map((d) => d.value)
-  const [whole, decimals] = shown ? num(shown.value).split(".") : ["—", ""]
-  const bankName = bankId === "best" ? "Best across banks" : status?.banks.find((b) => b.id === bankId)?.name
-
-  return (
-    <Card className="overflow-hidden">
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Select value={currency} onValueChange={(v) => v && onCurrency(v)}>
-            <SelectTrigger size="sm" className="w-24 font-mono" aria-label="Currency"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {(currencies.length ? currencies : ["USD"]).map((c) => <SelectItem key={c} value={c} className="font-mono">{c}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={bankId} onValueChange={(v) => v && setBankId(v)}>
-            <SelectTrigger size="sm" className="w-48" aria-label="Bank">
-              <SelectValue>{(v: string) => (v === "best" ? "Best across banks" : status?.banks.find((b) => b.id === v)?.name ?? v)}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="best">Best across banks</SelectItem>
-              {(status?.banks ?? []).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <div className="inline-flex rounded-lg bg-muted p-0.5" role="group" aria-label="Rate side">
-            {(["buying", "selling"] as const).map((s) => (
-              <button key={s} onClick={() => setSide(s)} aria-pressed={side === s}
-                className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors ${side === s ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          {!status ? <Skeleton className="h-12 w-56" /> : (
-            <div className="flex items-baseline gap-1 font-mono tracking-tight" aria-live="polite">
-              <span className="text-2xl text-muted-foreground sm:text-3xl">Rs</span>
-              <span className="text-4xl font-semibold sm:text-5xl">{whole}</span>
-              {decimals && <span className="text-xl font-medium text-muted-foreground sm:text-2xl">.{decimals}</span>}
-            </div>
-          )}
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-            {data.length > 1 && (
-              <span className={`inline-flex items-center gap-1 font-mono tabular-nums ${tone}`}>
-                {change > 0 ? <ArrowUp className="size-3.5" aria-hidden /> : change < 0 ? <ArrowDown className="size-3.5" aria-hidden /> : null}
-                {change >= 0 ? "+" : ""}{num(change)} ({first ? ((change / first.value) * 100).toFixed(2) : "0.00"}%)
-              </span>
+    <Table>
+      <TableHeader className="[&_tr]:border-b-2 [&_tr]:border-foreground">
+        <TableRow>
+          <TableHead>Bank</TableHead>
+          <TableHead className="text-right">Buying</TableHead>
+          <TableHead className="text-right">Selling</TableHead>
+          <TableHead className="hidden text-right md:table-cell">Spread</TableHead>
+          <TableHead className="hidden sm:table-cell">Bank updated</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map(({ bank, rate }) => (
+          <TableRow key={bank.id}>
+            <TableCell>
+              <div className="flex items-center gap-2.5 font-medium">
+                <span className="hidden sm:contents"><BankLogo bank={bank} /></span>
+                {bank.name}
+                <BankState bank={bank} />
+              </div>
+            </TableCell>
+            {rate ? (
+              <>
+                <RateCell value={rate.buying} best={rate.buying === top?.buying.value} label="Pays the most" />
+                <RateCell value={rate.selling} best={rate.selling === top?.selling.value} label="Charges the least" />
+                <TableCell className="hidden text-right font-mono text-muted-foreground md:table-cell">{num(rate.selling - rate.buying)}</TableCell>
+              </>
+            ) : (
+              <TableCell colSpan={3} className="text-right text-muted-foreground">{bank.fetchedAt || bank.error ? "Not offered" : "Loading…"}</TableCell>
             )}
-            <span className="text-muted-foreground">
-              {currency} {side} · {bankName} · {shown ? clock(shown.at) : "no data yet"}
-            </span>
-          </div>
-        </div>
-
-        <div className="relative">
-          {data.length < 2 ? (
-            <div className="flex h-56 flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-center text-sm text-muted-foreground sm:h-72">
-              <Activity className="size-5" aria-hidden />
-              <p>History builds up as rates refresh every 3 hours.</p>
-              <p className="text-xs">{data.length === 1 ? "One snapshot so far in this range." : "No snapshots in this range yet."}</p>
-            </div>
-          ) : (
-            <ChartContainer config={{ value: { label: side, color: stroke } }} className="aspect-auto h-56 w-full sm:h-72">
-              <LineChart data={data} margin={{ top: 8, right: 4, bottom: 8, left: 4 }}
-                onMouseMove={(s) => setHover(s?.activeTooltipIndex != null ? Number(s.activeTooltipIndex) : null)}
-                onMouseLeave={() => setHover(null)}>
-                <YAxis orientation="right" ticks={[Math.min(...values), Math.max(...values)]}
-                  domain={[(min: number) => min - (Math.max(...values) - min) * 0.08 - 0.01, (max: number) => max + (max - Math.min(...values)) * 0.08 + 0.01]}
-                  tickFormatter={(v: number) => num(v)} axisLine={false} tickLine={false} width={64}
-                  tick={{ fontFamily: "var(--font-mono)", fontSize: 11 }} />
-                <ChartTooltip cursor={{ stroke: "var(--foreground)", strokeWidth: 1 }} content={() => null} />
-                <Line dataKey="value" type="monotone" stroke={stroke} strokeWidth={2.25} dot={false}
-                  activeDot={{ r: 4, fill: stroke, stroke: "var(--background)", strokeWidth: 2 }} isAnimationActive={false} />
-              </LineChart>
-            </ChartContainer>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1 rounded-xl bg-muted/60 p-1" role="group" aria-label="Chart range">
-          {RANGES.map((r) => (
-            <button key={r.label} onClick={() => setRange(r.label)} aria-pressed={range === r.label}
-              className={`flex-1 rounded-lg py-1.5 font-mono text-xs font-medium transition-colors ${range === r.label ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
-              {r.label}
-            </button>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+            <TableCell className="hidden text-muted-foreground sm:table-cell">{bankClock(bank.bankUpdatedAt)}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   )
 }
 
-function UsageButton({ status }: { status: Status | null }) {
-  const u = status?.usage
+function BankSheet({ bank, now }: { bank: Bank; now: number }) {
   return (
-    <Popover>
-      <Tooltip>
-        <TooltipTrigger render={<PopoverTrigger render={<button aria-label="OpenRouter token usage" />} />}
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-          <Activity className="size-[18px]" aria-hidden />
-          {u && <span className="hidden font-mono text-xs sm:inline">{compact(u.totalTokens)}</span>}
-        </TooltipTrigger>
-        <TooltipContent>Token usage</TooltipContent>
-      </Tooltip>
-      <PopoverContent align="end" className="w-80">
-        <div className="space-y-3">
+    <div>
+      <div className="flex items-center justify-between gap-3 border-b-2 border-foreground pb-3">
+        <div className="flex items-center gap-3">
+          <BankLogo bank={bank} />
           <div>
-            <p className="font-heading text-sm font-semibold">OpenRouter usage</p>
-            <p className="text-xs text-muted-foreground">Since {u ? clock(u.since) : "—"}. Free models allow about 50 requests a day.</p>
+            <h3 className="font-heading text-lg font-bold">{bank.name} <BankState bank={bank} /></h3>
+            <p className="text-xs text-muted-foreground">Bank updated {bankClock(bank.bankUpdatedAt)} · fetched {relative(bank.fetchedAt, now)}</p>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-mono text-3xl font-semibold tracking-tight">{(u?.totalTokens ?? 0).toLocaleString()}</span>
-            <span className="text-xs text-muted-foreground">tokens</span>
-          </div>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-sm">
-            <Item label="Requests" value={u?.requests ?? 0} />
-            <Item label="Cost" value={`$${(u?.cost ?? 0).toFixed(4)}`} />
-            <Item label="Input tokens" value={(u?.promptTokens ?? 0).toLocaleString()} />
-            <Item label="Output tokens" value={(u?.completionTokens ?? 0).toLocaleString()} />
-            <Item label="Models" value={status?.models.join(", ") ?? "—"} wide />
-          </dl>
         </div>
-      </PopoverContent>
-    </Popover>
+        <a href={bank.url} target="_blank" rel="noreferrer" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={`Open ${bank.name} rates page`}>
+          <ExternalLink className="size-4" />
+        </a>
+      </div>
+      {bank.rates.length === 0 ? (
+        <p className="py-4 text-sm text-muted-foreground">{bank.error ?? "Loading…"}</p>
+      ) : (
+        <Table>
+          <TableHeader className="[&_tr]:border-b-2 [&_tr]:border-foreground">
+            <TableRow>
+              <TableHead>Currency</TableHead>
+              <TableHead className="text-right">Buying</TableHead>
+              <TableHead className="text-right">Selling</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {bank.rates.map((r) => (
+              <TableRow key={r.currency}>
+                <TableCell className="font-mono font-semibold" title={currencyName(r.currency)}><span className="inline-flex items-center gap-2"><Flag code={r.currency} />{r.currency}</span></TableCell>
+                <TableCell className="text-right font-mono">{num(r.buying)}</TableCell>
+                <TableCell className="text-right font-mono">{num(r.selling)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
   )
 }
 
-function Footer({ banks }: { banks: Bank[] }) {
+function Footer({ banks, canInstall, onInstall }: { banks: Bank[]; canInstall: boolean; onInstall: () => void }) {
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !(navigator as Navigator & { standalone?: boolean }).standalone
   return (
-    <footer className="mt-12 border-t bg-card/40">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-10 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
-        <div className="space-y-3">
+    <footer className="mt-16 bg-foreground text-background">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.5fr_1fr_1fr]">
+        <div className="space-y-4">
           <div className="flex items-center gap-2.5">
-            <Mark />
-            <span className="font-heading text-lg font-semibold tracking-tight">LKR Rates</span>
+            <img src="/logo.png" alt="" width={32} height={32} className="size-8" />
+            <span className="font-heading text-xl font-bold tracking-tight">LKR Rates</span>
           </div>
-          <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-            Telegraphic transfer buying and selling rates from Sri Lankan banks, refreshed every 3 hours and compared side by side.
+          <p className="max-w-sm text-sm leading-relaxed text-background/70">
+            Which Sri Lankan bank pays the most for your money today. Telegraphic transfer rates from {banks.length || 9} banks, read from their own websites every 3 hours.
           </p>
-          <a href={REPO} target="_blank" rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted">
-            <GitHubIcon className="size-4" /> Star on GitHub
-          </a>
+          <div className="flex flex-wrap gap-2">
+            {canInstall && (
+              <button onClick={onInstall} className="inline-flex h-9 items-center gap-2 rounded-md bg-background px-3.5 text-sm font-semibold text-foreground hover:opacity-85">
+                <Download className="size-4" aria-hidden /> Install app
+              </button>
+            )}
+            <a href={REPO} target="_blank" rel="noreferrer"
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-background/30 px-3.5 text-sm font-semibold hover:bg-background/10">
+              <GitHubIcon className="size-4" /> Star on GitHub
+            </a>
+          </div>
+          {ios && <p className="text-xs text-background/60">On iPhone: tap Share, then “Add to Home Screen” to install.</p>}
         </div>
         <nav aria-label="Bank sources">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sources</h3>
+          <h3 className="mb-3 text-sm font-semibold">Sources</h3>
           <ul className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm md:grid-cols-1">
             {banks.map((b) => (
-              <li key={b.id}>
-                <a href={b.url} target="_blank" rel="noreferrer" className="text-muted-foreground transition-colors hover:text-foreground">{b.name}</a>
-              </li>
+              <li key={b.id}><a href={b.url} target="_blank" rel="noreferrer" className="text-background/70 hover:text-background hover:underline">{b.name}</a></li>
             ))}
           </ul>
         </nav>
         <nav aria-label="Project">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Project</h3>
+          <h3 className="mb-3 text-sm font-semibold">Project</h3>
           <ul className="space-y-2 text-sm">
-            <li><a href={REPO} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">Source code</a></li>
-            <li><a href={`${REPO}#api`} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">API docs</a></li>
-            <li><a href={`${REPO}/issues`} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">Report an issue</a></li>
-            <li><a href={`${REPO}/blob/main/LICENSE`} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">MIT License</a></li>
+            <li><a href={REPO} target="_blank" rel="noreferrer" className="text-background/70 hover:text-background hover:underline">Source code</a></li>
+            <li><a href={`${REPO}#api`} target="_blank" rel="noreferrer" className="text-background/70 hover:text-background hover:underline">API and Telegram bot</a></li>
+            <li><a href={`${REPO}/issues`} target="_blank" rel="noreferrer" className="text-background/70 hover:text-background hover:underline">Report an issue</a></li>
+            <li><a href={`${REPO}/blob/main/LICENSE`} target="_blank" rel="noreferrer" className="text-background/70 hover:text-background hover:underline">MIT License</a></li>
           </ul>
         </nav>
       </div>
-      <div className="border-t">
-        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div className="border-t border-background/15">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-5 text-xs text-background/60 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p>
             © {new Date().getFullYear()} Built by{" "}
-            <a href="https://github.com/harindujayakody" target="_blank" rel="noreferrer" className="font-medium text-foreground hover:underline">Harindu Jayakody</a>
+            <a href="https://github.com/harindujayakody" target="_blank" rel="noreferrer" className="font-semibold text-background hover:underline">Harindu Jayakody</a>
             {" · "}
-            <a href={REPO} target="_blank" rel="noreferrer" className="hover:text-foreground hover:underline">exchnage-rates-srilanka</a>
+            <a href={REPO} target="_blank" rel="noreferrer" className="hover:text-background hover:underline">exchnage-rates-srilanka</a>
           </p>
-          <p>Indicative rates read from public bank websites. Confirm with your bank before you transact.</p>
+          <p>Indicative rates from public bank websites. Confirm with your bank before you transact.</p>
         </div>
       </div>
     </footer>
   )
-}
-
-// Icon by designhub on Flaticon (credited in the README).
-function Mark() {
-  return <img src="/logo.png" alt="" width={32} height={32} className="size-8" />
 }
 
 // Lucide dropped brand icons, so the GitHub mark is inlined.
@@ -703,30 +710,15 @@ function GitHubIcon({ className }: { className?: string }) {
   )
 }
 
-function RateCell({ value, best }: { value: number; best: boolean }) {
+function RateCell({ value, best, label }: { value: number; best: boolean; label: string }) {
   return (
-    <TableCell className="text-right font-mono tabular-nums">
-      <div className="flex items-center justify-end gap-2">
-        {best && <Badge className="hidden bg-up/15 text-up sm:inline-flex">Best</Badge>}
-        <span className={best ? "font-semibold text-up" : ""}>{num(value)}</span>
-      </div>
+    <TableCell className="text-right font-mono">
+      {best ? (
+        <span className="inline-flex items-center gap-1.5 rounded bg-foreground px-2 py-0.5 font-bold text-background" title={label}>
+          {num(value)}<span className="sr-only"> ({label.toLowerCase()})</span>
+        </span>
+      ) : num(value)}
     </TableCell>
-  )
-}
-
-function Stat({ icon: Icon, label, value, hint, loading }: {
-  icon: typeof Clock; label: string; value: string; hint: string; loading: boolean
-}) {
-  return (
-    <Card size="sm">
-      <CardContent className="space-y-1">
-        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-          <Icon className="size-3.5" aria-hidden /> {label}
-        </div>
-        {loading ? <Skeleton className="h-7 w-24" /> : <div className="font-heading text-xl font-semibold tracking-tight">{value}</div>}
-        <p className="truncate font-mono text-xs text-muted-foreground" title={hint}>{hint}</p>
-      </CardContent>
-    </Card>
   )
 }
 
@@ -738,7 +730,7 @@ const LOGOS: Record<string, string> = {
 
 function BankLogo({ bank }: { bank: Bank }) {
   const [failed, setFailed] = useState(false)
-  const box = "flex h-7 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white p-0.5"
+  const box = "flex h-7 w-14 shrink-0 items-center justify-center overflow-hidden rounded bg-white p-0.5 ring-1 ring-border"
   if (failed || !LOGOS[bank.id]) return <span className={box}><Landmark className="size-3.5 text-neutral-500" aria-hidden /></span>
   return (
     <span className={box}>
@@ -747,66 +739,17 @@ function BankLogo({ bank }: { bank: Bank }) {
   )
 }
 
-function BestCard({ icon: Icon, label, help, pick, loading, highlight }: {
-  icon: typeof Clock; label: string; help: string; pick?: Pick; loading: boolean; highlight?: boolean
-}) {
-  return (
-    <Card size="sm" className={highlight ? "bg-gradient-to-br from-up/20 to-card ring-up/30" : ""}>
-      <CardContent className="space-y-3">
-        <div className={`flex items-center gap-2 text-xs font-medium ${highlight ? "text-up" : "text-muted-foreground"}`}>
-          <Icon className="size-3.5" aria-hidden /> {label}
-        </div>
-        {loading ? <Skeleton className="h-12 w-full" /> : !pick ? (
-          <p className="text-sm text-muted-foreground">No bank offers this currency right now.</p>
-        ) : (
-          <>
-            <div className="flex items-end justify-between gap-3">
-              <div className="min-w-0 space-y-1">
-                {pick.banks.map((b) => (
-                  <div key={b.id} className="flex items-center gap-2 truncate font-semibold">
-                    <BankLogo bank={b} /> <span className="truncate">{b.name}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="font-mono text-2xl font-semibold tracking-tight tabular-nums">{num(pick.value)}</div>
-            </div>
-            <p className="text-xs text-muted-foreground">{pick.note}. {help}</p>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
 function BankState({ bank }: { bank: Bank }) {
   if (!bank.error) return null
   const stale = bank.rates.length > 0
   return (
     <Tooltip>
-      <TooltipTrigger render={<span />} className="inline-flex">
-        <Badge variant="outline" className="gap-1 border-down/40 text-down">
-          <AlertTriangle className="size-3" aria-hidden />
-          {stale ? "Stale" : "Unavailable"}
-        </Badge>
+      <TooltipTrigger render={<span />} className="inline-flex align-middle">
+        <span className="inline-flex items-center gap-1 rounded border border-down px-1.5 py-0.5 text-[11px] font-semibold text-down">
+          <AlertTriangle className="size-3" aria-hidden /> {stale ? "Stale" : "Unavailable"}
+        </span>
       </TooltipTrigger>
       <TooltipContent>{stale ? `Last update failed: ${bank.error}` : bank.error}</TooltipContent>
     </Tooltip>
-  )
-}
-
-function Item({ label, value, wide }: { label: string; value: string | number; wide?: boolean }) {
-  return (
-    <div className={wide ? "col-span-2" : ""}>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 break-words font-mono text-sm font-medium tabular-nums">{value}</dd>
-    </div>
-  )
-}
-
-function TableSkeleton() {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-8 w-full" />)}
-    </div>
   )
 }

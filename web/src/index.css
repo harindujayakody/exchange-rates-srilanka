@@ -6,6 +6,7 @@
 @import "@fontsource/poppins/500.css";
 @import "@fontsource/poppins/600.css";
 @import "@fontsource/poppins/700.css";
+@import "@fontsource/poppins/800.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -15,6 +16,8 @@
     --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
     --color-up: var(--up);
     --color-down: var(--down);
+    --color-slab-up: var(--slab-up);
+    --color-slab-down: var(--slab-down);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -56,76 +59,84 @@
 }
 
 :root {
-    --up: oklch(0.6 0.15 158);
-    --down: oklch(0.58 0.21 25);
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    /* Bold monochrome: pure white ground, near-black ink. Colour only marks movement. */
+    --up: #0b7a3b;
+    --down: #c42b1c;
+    /* The slab is inverted, so it borrows the other theme's movement colours. */
+    --slab-up: #4ade80;
+    --slab-down: #ff7b6b;
+    --background: #ffffff;
+    --foreground: #0a0a0a;
+    --card: #ffffff;
+    --card-foreground: #0a0a0a;
+    --popover: #ffffff;
+    --popover-foreground: #0a0a0a;
+    --primary: #0a0a0a;
+    --primary-foreground: #ffffff;
+    --secondary: #f2f2f2;
+    --secondary-foreground: #0a0a0a;
+    --muted: #f2f2f2;
+    --muted-foreground: #595959;
+    --accent: #f2f2f2;
+    --accent-foreground: #0a0a0a;
+    --destructive: #c42b1c;
+    --border: #dcdcdc;
+    --input: #cfcfcf;
+    --ring: #0a0a0a;
+    --chart-1: #0a0a0a;
+    --chart-2: #595959;
+    --chart-3: #8c8c8c;
+    --chart-4: #bdbdbd;
+    --chart-5: #e5e5e5;
+    --radius: 0.3125rem;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #0a0a0a;
+    --sidebar-primary: #0a0a0a;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #f2f2f2;
+    --sidebar-accent-foreground: #0a0a0a;
+    --sidebar-border: #dcdcdc;
+    --sidebar-ring: #0a0a0a;
+    color-scheme: light;
 }
 
 .dark {
-    --up: oklch(0.76 0.17 158);
-    --down: oklch(0.68 0.2 25);
-    --background: oklch(0.13 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.17 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.19 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --up: #4ade80;
+    --down: #ff7b6b;
+    --slab-up: #0b7a3b;
+    --slab-down: #c42b1c;
+    --background: #0a0a0a;
+    --foreground: #fafafa;
+    --card: #0a0a0a;
+    --card-foreground: #fafafa;
+    --popover: #141414;
+    --popover-foreground: #fafafa;
+    --primary: #fafafa;
+    --primary-foreground: #0a0a0a;
+    --secondary: #1a1a1a;
+    --secondary-foreground: #fafafa;
+    --muted: #1a1a1a;
+    --muted-foreground: #a6a6a6;
+    --accent: #1f1f1f;
+    --accent-foreground: #fafafa;
+    --destructive: #ff7b6b;
+    --border: #2a2a2a;
+    --input: #333333;
+    --ring: #fafafa;
+    --chart-1: #fafafa;
+    --chart-2: #a6a6a6;
+    --chart-3: #737373;
+    --chart-4: #404040;
+    --chart-5: #262626;
+    --sidebar: #0a0a0a;
+    --sidebar-foreground: #fafafa;
+    --sidebar-primary: #fafafa;
+    --sidebar-primary-foreground: #0a0a0a;
+    --sidebar-accent: #1f1f1f;
+    --sidebar-accent-foreground: #fafafa;
+    --sidebar-border: #2a2a2a;
+    --sidebar-ring: #fafafa;
+    color-scheme: dark;
 }
 
 @layer base {
@@ -140,7 +151,33 @@
     }
   html {
     @apply font-sans;
-    color-scheme: dark;
+    scrollbar-color: var(--muted-foreground) transparent;
+    -webkit-tap-highlight-color: transparent;
+    }
+  ::selection {
+    background: var(--foreground);
+    color: var(--background);
+    }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    }
+  .font-mono {
+    font-variant-numeric: tabular-nums slashed-zero;
+    }
+  a {
+    text-underline-offset: 3px;
+    }
+  /* Starts visible: if the animation never runs, the figures are still readable. */
+  @keyframes slab-wipe {
+    from { opacity: 0.35; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+    }
+  .slab-wipe {
+    animation: slab-wipe 420ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+  @media (prefers-reduced-motion: reduce) {
+    .slab-wipe { animation: none; }
     }
   h1, h2, h3 {
     @apply font-heading;

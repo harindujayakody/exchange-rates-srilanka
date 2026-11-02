@@ -9,3 +9,10 @@ data/
 node_modules/
 web/dist/
 *.log
+
+# Impeccable working files (the surface brief in .impeccable/surfaces is kept)
+.impeccable/review/
+.impeccable/mocks/
+.impeccable/decision/
+.impeccable/build/
+.impeccable/questions/

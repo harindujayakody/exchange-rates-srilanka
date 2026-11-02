@@ -1,0 +1,590 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-02T07:27:56.378Z",
+  "title": "Design System: LKR Rates",
+  "extensions": {
+    "colorMeta": {
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#1a1a1a",
+          "#2a2a2a",
+          "#404040",
+          "#595959",
+          "#8c8c8c",
+          "#cfcfcf",
+          "#f2f2f2"
+        ],
+        "note": "Light ground; text on inverted fields. CSS --background (light)."
+      },
+      "ink": {
+        "role": "primary",
+        "displayName": "Ink",
+        "canonical": "#0a0a0a",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#1a1a1a",
+          "#2a2a2a",
+          "#404040",
+          "#595959",
+          "#8c8c8c",
+          "#cfcfcf",
+          "#f2f2f2"
+        ],
+        "note": "Light text, rules, slab, primary button; dark ground. CSS --foreground (light), --background (dark)."
+      },
+      "snow": {
+        "role": "primary",
+        "displayName": "Snow",
+        "canonical": "#fafafa",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#1a1a1a",
+          "#2a2a2a",
+          "#404040",
+          "#595959",
+          "#8c8c8c",
+          "#cfcfcf",
+          "#f2f2f2"
+        ],
+        "note": "Dark-theme text, rules and slab field. CSS --foreground (dark)."
+      },
+      "wash": {
+        "role": "neutral",
+        "displayName": "Wash",
+        "canonical": "#f2f2f2",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#1a1a1a",
+          "#2a2a2a",
+          "#404040",
+          "#595959",
+          "#8c8c8c",
+          "#cfcfcf",
+          "#f2f2f2"
+        ],
+        "note": "Hover fill, skeletons. CSS --muted/--secondary/--accent (light)."
+      },
+      "wash-dark": {
+        "role": "neutral",
+        "displayName": "Wash (dark)",
+        "canonical": "#1a1a1a",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#1a1a1a",
+          "#2a2a2a",
+          "#404040",
+          "#595959",
+          "#8c8c8c",
+          "#cfcfcf",
+          "#f2f2f2"
+        ],
+        "note": "CSS --muted/--secondary (dark)."
+      },
+      "wash-dark-raised": {
+        "role": "neutral",
+        "displayName": "Wash Raised (dark)",
+        "canonical": "#1f1f1f",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#1a1a1a",
+          "#2a2a2a",
+          "#404040",
+          "#595959",
+          "#8c8c8c",
+          "#cfcfcf",
+          "#f2f2f2"
+        ],
+        "note": "CSS --accent (dark)."
+      },
+      "popover-dark": {
+        "role": "neutral",
+        "displayName": "Popover (dark)",
+        "canonical": "#141414",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#1a1a1a",
+          "#2a2a2a",
+          "#404040",
+          "#595959",
+          "#8c8c8c",
+          "#cfcfcf",
+          "#f2f2f2"
+        ],
+        "note": "CSS --popover (dark)."
+      },
+      "graphite": {
+        "role": "neutral",
+        "displayName": "Graphite",
+        "canonical": "#595959",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#1a1a1a",
+          "#2a2a2a",
+          "#404040",
+          "#595959",
+          "#8c8c8c",
+          "#cfcfcf",
+          "#f2f2f2"
+        ],
+        "note": "Secondary text. CSS --muted-foreground (light)."
+      },
+      "graphite-dark": {
+        "role": "neutral",
+        "displayName": "Graphite (dark)",
+        "canonical": "#a6a6a6",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#1a1a1a",
+          "#2a2a2a",
+          "#404040",
+          "#595959",
+          "#8c8c8c",
+          "#cfcfcf",
+          "#f2f2f2"
+        ],
+        "note": "CSS --muted-foreground (dark); share card secondary text."
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#dcdcdc",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#1a1a1a",
+          "#2a2a2a",
+          "#404040",
+          "#595959",
+          "#8c8c8c",
+          "#cfcfcf",
+          "#f2f2f2"
+        ],
+        "note": "1px row rules. CSS --border (light)."
+      },
+      "hairline-dark": {
+        "role": "neutral",
+        "displayName": "Hairline (dark)",
+        "canonical": "#2a2a2a",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#1a1a1a",
+          "#2a2a2a",
+          "#404040",
+          "#595959",
+          "#8c8c8c",
+          "#cfcfcf",
+          "#f2f2f2"
+        ],
+        "note": "CSS --border (dark)."
+      },
+      "field-edge": {
+        "role": "neutral",
+        "displayName": "Field Edge",
+        "canonical": "#cfcfcf",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#1a1a1a",
+          "#2a2a2a",
+          "#404040",
+          "#595959",
+          "#8c8c8c",
+          "#cfcfcf",
+          "#f2f2f2"
+        ],
+        "note": "CSS --input (light)."
+      },
+      "field-edge-dark": {
+        "role": "neutral",
+        "displayName": "Field Edge (dark)",
+        "canonical": "#333333",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#1a1a1a",
+          "#2a2a2a",
+          "#404040",
+          "#595959",
+          "#8c8c8c",
+          "#cfcfcf",
+          "#f2f2f2"
+        ],
+        "note": "CSS --input (dark)."
+      },
+      "up": {
+        "role": "secondary",
+        "displayName": "Ledger Green",
+        "canonical": "#0b7a3b",
+        "tonalRamp": [
+          "#052e16",
+          "#0b5a2c",
+          "#0b7a3b",
+          "#15964b",
+          "#22b35d",
+          "#4ade80",
+          "#9ef0b8",
+          "#dcfce7"
+        ],
+        "note": "Favourable move, light theme. CSS --up."
+      },
+      "down": {
+        "role": "secondary",
+        "displayName": "Signal Red",
+        "canonical": "#c42b1c",
+        "tonalRamp": [
+          "#3b0d08",
+          "#7a1b11",
+          "#c42b1c",
+          "#e0493a",
+          "#f2604f",
+          "#ff7b6b",
+          "#ffb3a8",
+          "#ffe4e0"
+        ],
+        "note": "Unfavourable move and failure, light theme. CSS --down, --destructive."
+      },
+      "up-dark": {
+        "role": "secondary",
+        "displayName": "Ledger Green (dark)",
+        "canonical": "#4ade80",
+        "tonalRamp": [
+          "#052e16",
+          "#0b5a2c",
+          "#0b7a3b",
+          "#15964b",
+          "#22b35d",
+          "#4ade80",
+          "#9ef0b8",
+          "#dcfce7"
+        ],
+        "note": "CSS --up (dark)."
+      },
+      "down-dark": {
+        "role": "secondary",
+        "displayName": "Signal Red (dark)",
+        "canonical": "#ff7b6b",
+        "tonalRamp": [
+          "#3b0d08",
+          "#7a1b11",
+          "#c42b1c",
+          "#e0493a",
+          "#f2604f",
+          "#ff7b6b",
+          "#ffb3a8",
+          "#ffe4e0"
+        ],
+        "note": "CSS --down, --destructive (dark)."
+      },
+      "slab-up": {
+        "role": "secondary",
+        "displayName": "Slab Green",
+        "canonical": "#4ade80",
+        "tonalRamp": [
+          "#052e16",
+          "#0b5a2c",
+          "#0b7a3b",
+          "#15964b",
+          "#22b35d",
+          "#4ade80",
+          "#9ef0b8",
+          "#dcfce7"
+        ],
+        "note": "Inside the ink slab on light. CSS --slab-up. Borrows the dark pair."
+      },
+      "slab-down": {
+        "role": "secondary",
+        "displayName": "Slab Red",
+        "canonical": "#ff7b6b",
+        "tonalRamp": [
+          "#3b0d08",
+          "#7a1b11",
+          "#c42b1c",
+          "#e0493a",
+          "#f2604f",
+          "#ff7b6b",
+          "#ffb3a8",
+          "#ffe4e0"
+        ],
+        "note": "CSS --slab-down (light)."
+      },
+      "slab-up-dark": {
+        "role": "secondary",
+        "displayName": "Slab Green (dark)",
+        "canonical": "#0b7a3b",
+        "tonalRamp": [
+          "#052e16",
+          "#0b5a2c",
+          "#0b7a3b",
+          "#15964b",
+          "#22b35d",
+          "#4ade80",
+          "#9ef0b8",
+          "#dcfce7"
+        ],
+        "note": "Inside the snow slab on dark. CSS --slab-up (dark)."
+      },
+      "slab-down-dark": {
+        "role": "secondary",
+        "displayName": "Slab Red (dark)",
+        "canonical": "#c42b1c",
+        "tonalRamp": [
+          "#3b0d08",
+          "#7a1b11",
+          "#c42b1c",
+          "#e0493a",
+          "#f2604f",
+          "#ff7b6b",
+          "#ffb3a8",
+          "#ffe4e0"
+        ],
+        "note": "CSS --slab-down (dark)."
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The bank name in the slab only. 1.875rem below 640px, 2.75rem above."
+      },
+      "rate": {
+        "displayName": "Rate",
+        "purpose": "The slab's whole-number rate. 3.75rem below 640px, 4.5rem above; Rs and decimals beside it at 60% opacity."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section heads over a 2px ink rule."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Wordmark (1.25rem) and bank sheet headings (1.125rem)."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Hints, table text, slab meta, footer copy."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Buttons, segmented controls, status line, footer column heads."
+      },
+      "numeral": {
+        "displayName": "Numeral",
+        "purpose": "Every rate, spread, count and change figure."
+      },
+      "code": {
+        "displayName": "Currency Code",
+        "purpose": "Currency codes after a flag; 1.125rem 700 in list rows, 0.875rem 600 in chips."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "slab-wipe",
+        "value": "420ms cubic-bezier(0.16, 1, 0.3, 1); from opacity 0.35 and translateY(6px)",
+        "purpose": "The only authored motion: slab figures fade and rise in when currency, bank or side changes. Removed under prefers-reduced-motion."
+      },
+      {
+        "name": "hover-fade",
+        "value": "opacity 0.85 on hover",
+        "purpose": "Filled buttons."
+      },
+      {
+        "name": "hover-fill",
+        "value": "background-color transition to the wash colour",
+        "purpose": "Chips, icon buttons, list and table rows."
+      },
+      {
+        "name": "skeleton-pulse",
+        "value": "animate-pulse",
+        "purpose": "Loading placeholders."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "container",
+        "value": "1152px"
+      }
+    ],
+    "rules": [
+      {
+        "name": "rule-structural",
+        "value": "2px solid var(--foreground)",
+        "purpose": "Under the header, every section head and each bank sheet title; outline of currency chips and the search field."
+      },
+      {
+        "name": "rule-row",
+        "value": "1px solid var(--border)",
+        "purpose": "Between list and table rows."
+      },
+      {
+        "name": "rule-on-inverted",
+        "value": "1px solid var(--background) at 15% (control outlines at 30%)",
+        "purpose": "Rules and outlines inside the slab and footer."
+      },
+      {
+        "name": "focus",
+        "value": "outline: 2px solid var(--ring); outline-offset: 2px",
+        "purpose": "Global focus-visible ring."
+      }
+    ],
+    "shareCard": {
+      "size": "1080x1350",
+      "margin": "80px",
+      "ground": "#0a0a0a",
+      "ink": "#fafafa",
+      "dim": "#a6a6a6",
+      "up": "#4ade80",
+      "down": "#ff7b6b",
+      "rule": "3px",
+      "historyLine": "5px"
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Header Refresh: ink field, paper text, mono remaining count.",
+      "html": "<button class=\"ds-btn-primary\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\"/><path d=\"M21 3v5h-5\"/><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\"/><path d=\"M8 16H3v5\"/></svg>Refresh <span class=\"ds-count\">2/2</span></button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border: 0; border-radius: 4px; background: var(--foreground, #0a0a0a); color: var(--background, #fff); font: 600 14px 'Inter Variable', sans-serif; cursor: pointer; transition: opacity .15s; } .ds-btn-primary .ds-count { font: 12px 'JetBrains Mono Variable', monospace; font-variant-numeric: tabular-nums slashed-zero; opacity: .7; } .ds-btn-primary:hover { opacity: .85; } .ds-btn-primary:focus-visible { outline: 2px solid var(--ring, #0a0a0a); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: .4; cursor: not-allowed; }"
+    },
+    {
+      "name": "On-Slab Button",
+      "kind": "button",
+      "refersTo": "button-on-slab",
+      "description": "Share and Install: paper field on an ink surface.",
+      "html": "<div class=\"ds-ink\"><button class=\"ds-btn-paper\">Share</button></div>",
+      "css": ".ds-ink { background: var(--foreground, #0a0a0a); padding: 16px; border-radius: 4px; } .ds-btn-paper { height: 36px; padding: 0 14px; border: 0; border-radius: 4px; background: var(--background, #fff); color: var(--foreground, #0a0a0a); font: 600 14px 'Inter Variable', sans-serif; cursor: pointer; transition: opacity .15s; } .ds-btn-paper:hover { opacity: .85; } .ds-btn-paper:focus-visible { outline: 2px solid var(--background, #fff); outline-offset: 2px; }"
+    },
+    {
+      "name": "Currency Chip",
+      "kind": "chip",
+      "refersTo": "chip-currency",
+      "description": "Rail chip with a flag before the code; the current currency is inverted.",
+      "html": "<nav class=\"ds-rail\"><button class=\"ds-chip\" aria-pressed=\"true\"><span class=\"ds-flag\"></span>USD</button><button class=\"ds-chip\" aria-pressed=\"false\"><span class=\"ds-flag\"></span>EUR</button><button class=\"ds-chip\" aria-pressed=\"false\"><span class=\"ds-flag\"></span>GBP</button></nav>",
+      "css": ".ds-rail { display: flex; gap: 6px; } .ds-chip { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border: 2px solid var(--foreground, #0a0a0a); border-radius: 4px; background: transparent; color: var(--foreground, #0a0a0a); font: 600 14px 'JetBrains Mono Variable', monospace; font-variant-numeric: tabular-nums slashed-zero; cursor: pointer; transition: background-color .15s; } .ds-chip:hover { background: var(--muted, #f2f2f2); } .ds-chip[aria-pressed=true] { background: var(--foreground, #0a0a0a); color: var(--background, #fff); } .ds-chip:focus-visible { outline: 2px solid var(--ring, #0a0a0a); outline-offset: 2px; } .ds-flag { width: 21px; height: 14px; border-radius: 2px; background: var(--muted, #f2f2f2); outline: 1px solid rgba(0,0,0,.15); outline-offset: -1px; }"
+    },
+    {
+      "name": "The Slab",
+      "kind": "custom",
+      "refersTo": "slab",
+      "description": "The inverted answer block: bank name, monumental rate, change line with arrow and sign, ruled facts.",
+      "html": "<section class=\"ds-slab\"><h1>Seylan Bank</h1><p class=\"ds-rate\"><span class=\"ds-dim\">Rs</span><span class=\"ds-whole\">329</span><span class=\"ds-dim ds-dec\">.00</span></p><p class=\"ds-meta\"><span class=\"ds-up\"><svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 7-7 7 7\"/><path d=\"M12 19V5\"/></svg>+1.25 (0.38%) 1W</span><span><b>Highest buying rate</b> &middot; for 1 USD</span></p><dl class=\"ds-facts\"><div><dt>Lowest selling</dt><dd><b>334.50</b>BOC</dd></div><div><dt>Smallest spread</dt><dd><b>4.00</b>NDB</dd></div></dl></section>",
+      "css": ".ds-slab { background: var(--foreground, #0a0a0a); color: var(--background, #fff); border-radius: 4px; padding: 32px; display: flex; flex-direction: column; gap: 16px; } .ds-slab h1 { margin: 0; font: 800 2.75rem/1.25 'Poppins', 'Inter Variable', sans-serif; letter-spacing: -0.025em; } .ds-rate { margin: 0; display: flex; align-items: baseline; gap: 8px; font-family: 'JetBrains Mono Variable', monospace; font-variant-numeric: tabular-nums slashed-zero; line-height: 1; } .ds-whole { font-size: 6rem; font-weight: 700; letter-spacing: -0.04em; } .ds-dim { opacity: .6; font-size: 1.875rem; font-weight: 500; } .ds-dec { font-size: 2.25rem; font-weight: 600; } .ds-meta { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; font: 14px 'Inter Variable', sans-serif; } .ds-meta > span:last-child { opacity: .7; } .ds-up { display: inline-flex; align-items: center; gap: 4px; color: var(--slab-up, #4ade80); font: 600 14px 'JetBrains Mono Variable', monospace; font-variant-numeric: tabular-nums slashed-zero; } .ds-facts { margin: 0; font: 14px 'Inter Variable', sans-serif; border-top: 1px solid rgba(255,255,255,.15); } .ds-facts div { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.15); } .ds-facts dt { opacity: .7; } .ds-facts dd { margin: 0; } .ds-facts b { font: 600 14px 'JetBrains Mono Variable', monospace; font-variant-numeric: tabular-nums slashed-zero; margin-right: 8px; }"
+    },
+    {
+      "name": "Section Head",
+      "kind": "custom",
+      "refersTo": "headline",
+      "description": "Poppins heading and graphite hint over a 2px ink rule.",
+      "html": "<div class=\"ds-head\"><h2>USD at every bank</h2><p>Buying: what the bank pays you. Selling: what you pay the bank.</p></div>",
+      "css": ".ds-head { border-bottom: 2px solid var(--foreground, #0a0a0a); padding-bottom: 12px; } .ds-head h2 { margin: 0; font: 700 1.5rem/1.33 'Poppins', 'Inter Variable', sans-serif; letter-spacing: -0.025em; color: var(--foreground, #0a0a0a); } .ds-head p { margin: 4px 0 0; font: 14px 'Inter Variable', sans-serif; color: var(--muted-foreground, #595959); }"
+    },
+    {
+      "name": "Ruled List Row",
+      "kind": "custom",
+      "refersTo": "list-row-active",
+      "description": "Top-currencies row on a hairline; the current currency inverts.",
+      "html": "<div class=\"ds-list\"><button class=\"ds-row\" aria-pressed=\"true\"><span><b>USD</b><small>US Dollar</small></span><span class=\"ds-who\">Seylan pays most</span><span class=\"ds-num\"><b>329.00</b><small>334.50</small></span></button><button class=\"ds-row\" aria-pressed=\"false\"><span><b>EUR</b><small>Euro</small></span><span class=\"ds-who\">NTB pays most</span><span class=\"ds-num\"><b>356.10</b><small>364.20</small></span></button></div>",
+      "css": ".ds-list { display: grid; } .ds-row { display: grid; grid-template-columns: 4.75rem minmax(0,1fr) auto; align-items: center; gap: 12px; padding: 12px 8px; border: 0; border-bottom: 1px solid var(--border, #dcdcdc); background: transparent; color: var(--foreground, #0a0a0a); text-align: left; cursor: pointer; font: 12px 'Inter Variable', sans-serif; transition: background-color .15s; } .ds-row:hover { background: var(--muted, #f2f2f2); } .ds-row[aria-pressed=true] { background: var(--foreground, #0a0a0a); color: var(--background, #fff); } .ds-row b { display: block; font: 700 1.125rem/1 'JetBrains Mono Variable', monospace; } .ds-num { text-align: right; font-family: 'JetBrains Mono Variable', monospace; font-variant-numeric: tabular-nums slashed-zero; } .ds-num b { font-size: 14px; } .ds-row small { display: block; margin-top: 4px; opacity: .7; } .ds-row:focus-visible { outline: 2px solid var(--ring, #0a0a0a); outline-offset: 2px; }"
+    },
+    {
+      "name": "Best-Value Chip",
+      "kind": "chip",
+      "refersTo": "best-value-chip",
+      "description": "The best buying or selling figure in a table column, inverted, with a screen-reader label.",
+      "html": "<table class=\"ds-table\"><tr><td>Seylan Bank</td><td><span class=\"ds-best\" title=\"Pays the most\">329.00<span class=\"ds-sr\"> (pays the most)</span></span></td></tr><tr><td>Bank of Ceylon</td><td>327.85</td></tr></table>",
+      "css": ".ds-table { width: 100%; border-collapse: collapse; font: 14px 'Inter Variable', sans-serif; color: var(--foreground, #0a0a0a); } .ds-table td { padding: 8px; border-bottom: 1px solid var(--border, #dcdcdc); } .ds-table td + td { text-align: right; font-family: 'JetBrains Mono Variable', monospace; font-variant-numeric: tabular-nums slashed-zero; } .ds-table tr:hover td { background: color-mix(in srgb, var(--muted, #f2f2f2) 50%, transparent); } .ds-best { display: inline-flex; padding: 2px 8px; border-radius: 4px; background: var(--foreground, #0a0a0a); color: var(--background, #fff); font-weight: 700; } .ds-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "input-search",
+      "description": "2px ink-outlined search with an inset icon.",
+      "html": "<label class=\"ds-search\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input placeholder=\"Search a bank or currency\" aria-label=\"Search banks and currencies\"></label>",
+      "css": ".ds-search { position: relative; display: block; width: 320px; } .ds-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted-foreground, #595959); } .ds-search input { width: 100%; height: 40px; padding: 0 36px; border: 2px solid var(--foreground, #0a0a0a); border-radius: 4px; background: transparent; color: var(--foreground, #0a0a0a); font: 14px 'Inter Variable', sans-serif; box-sizing: border-box; } .ds-search input:focus-visible { outline: 2px solid var(--ring, #0a0a0a); outline-offset: 2px; }"
+    },
+    {
+      "name": "Stale Badge",
+      "kind": "chip",
+      "refersTo": "badge-stale",
+      "description": "Failure marker: red outline, warning icon and a word, never colour alone.",
+      "html": "<span class=\"ds-stale\"><svg viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\"/><path d=\"M12 9v4\"/><path d=\"M12 17h.01\"/></svg>Stale</span>",
+      "css": ".ds-stale { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border: 1px solid var(--down, #c42b1c); border-radius: 4px; color: var(--down, #c42b1c); font: 600 11px 'Inter Variable', sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Rate Board",
+    "overview": "LKR Rates reads like a bank's own rate board, rebuilt in print: pure white paper, near-black ink, and one answer set solid. The page is organised around a single inverted block, the slab, that names the bank paying the most and its rate at monumental size. Everything else is crisp ruled monochrome: 2px ink rules under the header and every section head, 1px hairlines between rows, and tight 4-6px corners. Depth comes from inversion (ink on paper becomes paper on ink), never from shadow.\n\nThe system is dense but calm. Numbers do the talking in JetBrains Mono with tabular, slashed-zero figures so columns align and 0 never reads as O. Poppins carries the bank name and section heads; Inter carries everything a person reads as a sentence. Colour is reserved for movement only, green up and red down, and always travels with an arrow and a sign. Both themes are first-class: the dark theme is the exact inversion of the light one, and the slab inverts with it.\n\nThe world explicitly refuses the category default: a soft dark fintech dashboard of rounded cards, green glows and gradient tiles.",
+    "keyCharacteristics": [
+      "One inverted slab per screen carries the answer; nothing else competes with it.",
+      "Solid rules (2px ink for structure, 1px hairline for rows) instead of boxes and cards.",
+      "Every number in JetBrains Mono, tabular and slashed-zero.",
+      "Colour only for movement, always paired with an arrow and a +/- sign.",
+      "Selection and \"best\" are shown by inversion, not by tint.",
+      "Flat: no shadows, no gradients, no glows, no glass."
+    ],
+    "rules": [
+      {
+        "name": "The Movement-Only Rule",
+        "body": "Colour appears only to mark a rate moving, and a broken state. Selection, rank, emphasis and brand are all ink and paper.",
+        "section": "colors"
+      },
+      {
+        "name": "The Borrowed Pair Rule",
+        "body": "Inside the slab, movement uses `slab-up`/`slab-down`, the other theme's pair, so green and red keep their contrast on the inverted field.",
+        "section": "colors"
+      },
+      {
+        "name": "The Inversion Rule",
+        "body": "\"Selected\" and \"best\" are expressed by swapping ink and paper (active chip, active row, best-value chip), never by a tint, outline glow or colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Rule",
+        "body": "Every number is JetBrains Mono with `font-variant-numeric: tabular-nums slashed-zero` (applied to every `.font-mono`). No proportional figures anywhere a rate appears, including the share card.",
+        "section": "typography"
+      },
+      {
+        "name": "The Bank-Is-The-Headline Rule",
+        "body": "The largest words on the page are a bank's name; the largest figure is that bank's rate. What the figure means (\"Highest buying rate · for 1 USD\") sits beneath in body text.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Ink Rule",
+        "body": "If something needs to stand forward, invert it or rule it. Never lift it with a shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do put the answer in the slab: bank name in Poppins 800, the rate in JetBrains Mono 700, inverted against the page.",
+      "Do set every number in JetBrains Mono with tabular, slashed-zero figures.",
+      "Do mark selection and \"best\" by inverting ink and paper, and add an aria-pressed state or a screen-reader label so it is never visual-only.",
+      "Do pair every movement colour with an arrow icon and a +/- sign; inside the slab use `slab-up`/`slab-down`.",
+      "Do separate sections with a 2px ink rule under the heading and rows with 1px hairlines.",
+      "Do put a flag before every currency code, in the same 14 x 21px frame, with an empty frame when no flag exists so rows stay aligned.",
+      "Do show provenance next to every figure: which bank, and how fresh.",
+      "Do keep the slab wipe as the only authored motion, and honour reduced motion."
+    ],
+    "donts": [
+      "Don't use colour as the only signal for up, down, best, selected or broken.",
+      "Don't use colour for brand, emphasis or decoration; it belongs to movement and failure only.",
+      "Don't use gradients, glows, drop shadows or glass on any page surface.",
+      "Don't build card grids or rounded tiles; use ruled rows, ruled tables and the one slab.",
+      "Don't round corners past 6px.",
+      "Don't wrap the bank name in a sentence or put a label line above it; the headline is the bank name only.",
+      "Don't set display type in a system face or numbers in a proportional face."
+    ]
+  }
+}
