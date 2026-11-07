@@ -1,6 +1,6 @@
 // node test.mjs  (no API key needed)
 import assert from 'node:assert';
-import { pageText, cleanRates, allowManual, ttColumns, bankTime, overLimit, trackUsage, authorized, health, acceptPush } from './server.mjs';
+import { pageText, cleanRates, allowManual, ttColumns, bankTime, overLimit, trackUsage, authorized, health, acceptPush, MAX_HISTORY, formatHistory } from './server.mjs';
 
 // Push from the home agent: allowed banks only, sane rates, real non-future time, never older than what is saved.
 {
@@ -123,6 +123,34 @@ assert.deepStrictEqual(ttColumns([{ currency: 'USD', values: [326.6, 326.6, 327.
   [{ currency: 'USD', buying: 327.85, selling: 337.35 }]);
 assert.deepStrictEqual(ttColumns([{ currency: 'USD', values: [328.5, 325, 336.5, 337.5] }], [0, 2]),
   [{ currency: 'USD', buying: 328.5, selling: 336.5 }]);
+
+
+// History capping and limit parameter
+{
+  assert.strictEqual(MAX_HISTORY, 720);
+  const sampleHist = [
+    { at: '2026-11-01T00:00:00Z', rates: { boc: { USD: [320, 330], EUR: [350, 360] } } },
+    { at: '2026-11-02T00:00:00Z', rates: { boc: { USD: [321, 331] }, seylan: { USD: [322, 332] } } },
+    { at: '2026-11-03T00:00:00Z', rates: { boc: { USD: [323, 333] }, seylan: { USD: [324, 334] } } },
+  ];
+  const allUsd = formatHistory(sampleHist, 'USD');
+  assert.strictEqual(allUsd.length, 3);
+  assert.deepStrictEqual(allUsd[2].rates, { boc: [323, 333], seylan: [324, 334] });
+
+  const limited = formatHistory(sampleHist, 'USD', 2);
+  assert.strictEqual(limited.length, 2);
+  assert.strictEqual(limited[0].at, '2026-11-02T00:00:00Z');
+  assert.strictEqual(limited[1].at, '2026-11-03T00:00:00Z');
+
+  const limitedString = formatHistory(sampleHist, 'USD', '1');
+  assert.strictEqual(limitedString.length, 1);
+  assert.strictEqual(limitedString[0].at, '2026-11-03T00:00:00Z');
+
+  const eurOnly = formatHistory(sampleHist, 'EUR', 10);
+  assert.strictEqual(eurOnly.length, 3);
+  assert.deepStrictEqual(eurOnly[0].rates, { boc: [350, 360] });
+  assert.deepStrictEqual(eurOnly[1].rates, {});
+}
 
 const now = 10_000_000;
 assert.deepStrictEqual(allowManual([], now), [now]);

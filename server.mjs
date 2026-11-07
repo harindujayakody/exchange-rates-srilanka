@@ -34,6 +34,7 @@ const BANKS = {
 };
 const MODELS = (process.env.OPENROUTER_MODELS || 'nvidia/nemotron-3.5-super-vl:free,google/gemma-4-31b-it:free').split(',');
 export const REFRESH_MS = (Number(process.env.REFRESH_HOURS) || 3) * 3_600_000;
+export const MAX_HISTORY = 720; // 90 days at 8 refreshes/day (every 3 hours)
 const MANUAL_LIMIT = 2; // per hour, for the whole server: protects the free OpenRouter quota
 // Banks that block the server's IP can be fetched by push-agent.mjs on a home connection instead, which sends
 // them to POST /api/push. With PUSH_TOKEN set, the server stops fetching those banks itself.
@@ -186,8 +187,13 @@ async function save(fresh, at = state.lastRefresh.at) {
     rates: Object.fromEntries(fresh.map(id => [id, Object.fromEntries(state.banks[id].rates.map(r => [r.currency, [r.buying, r.selling]]))])),
   };
   history.push(snapshot);
+  if (history.length > MAX_HISTORY) history = history.slice(-MAX_HISTORY);
   await mkdir(DATA, { recursive: true });
-  await appendFile(HISTORY_FILE, JSON.stringify(snapshot) + '\n');
+  if (history.length >= MAX_HISTORY) {
+    await writeFile(HISTORY_FILE, history.map(h => JSON.stringify(h)).join('\n') + '\n');
+  } else {
+    await appendFile(HISTORY_FILE, JSON.stringify(snapshot) + '\n');
+  }
   const { banks, lastRefresh, usage, manual } = state;
   await writeFile(STATE_FILE + '.tmp', JSON.stringify({ banks, lastRefresh, usage, manual }));
   await rename(STATE_FILE + '.tmp', STATE_FILE); // atomic, so a crash never leaves half a file
@@ -195,7 +201,10 @@ async function save(fresh, at = state.lastRefresh.at) {
 
 async function restore() {
   try { Object.assign(state, JSON.parse(await readFile(STATE_FILE, 'utf8'))); } catch {}
-  try { history = (await readFile(HISTORY_FILE, 'utf8')).split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch {}
+  try {
+    const lines = (await readFile(HISTORY_FILE, 'utf8')).split('\n').filter(Boolean);
+    history = lines.slice(-MAX_HISTORY).map(l => JSON.parse(l));
+  } catch {}
 }
 
 function refreshAll(trigger) {
@@ -333,7 +342,10 @@ const OPENAPI = {
     '/banks': { get: { operationId: 'listBanks', summary: 'Supported bank ids', responses: { 200: { description: 'Array of bank ids' } } } },
     '/api/history': { get: {
       operationId: 'rateHistory', summary: 'Saved snapshots for one currency',
-      parameters: [{ name: 'currency', in: 'query', schema: { type: 'string', example: 'USD' } }],
+      parameters: [
+        { name: 'currency', in: 'query', schema: { type: 'string', example: 'USD' } },
+        { name: 'limit', in: 'query', schema: { type: 'integer', default: 720, maximum: 720, minimum: 1 }, description: 'Number of recent snapshots to return (max 720)' },
+      ],
       responses: { 200: { description: 'Array of {at, rates: {bankId: [buying, selling]}}' } },
     } },
   },
@@ -360,6 +372,14 @@ async function serveStatic(res, pathname) {
     } catch {}
   }
   send(res, 404, { error: 'Not found. Build the UI with: cd web && npm run build' });
+}
+
+export function formatHistory(hist, cur = 'USD', limit = MAX_HISTORY) {
+  const numLimit = Math.min(Math.max(parseInt(limit, 10) || MAX_HISTORY, 1), MAX_HISTORY);
+  const sliced = hist.slice(-numLimit);
+  return sliced.map(h => ({
+    at: h.at, rates: Object.fromEntries(Object.entries(h.rates).flatMap(([id, r]) => (r[cur] ? [[id, r[cur]]] : []))),
+  }));
 }
 
 async function handle(req, res) {
@@ -393,9 +413,7 @@ async function handle(req, res) {
   }
   if (route === 'api' && bank === 'history') {
     const cur = currency || 'USD';
-    return send(res, 200, history.map(h => ({
-      at: h.at, rates: Object.fromEntries(Object.entries(h.rates).flatMap(([id, r]) => (r[cur] ? [[id, r[cur]]] : []))),
-    })));
+    return send(res, 200, formatHistory(history, cur, url.searchParams.get('limit')));
   }
   if (route === 'api' && bank === 'refresh' && req.method === 'POST') {
     if (!sameOrigin(req)) return send(res, 403, { error: 'Refresh is only allowed from the app' });
