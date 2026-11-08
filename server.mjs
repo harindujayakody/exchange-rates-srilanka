@@ -259,7 +259,7 @@ const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
-  'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+  'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self'; "
     + "frame-ancestors 'none'; base-uri 'self'; form-action 'none'",
 };
 

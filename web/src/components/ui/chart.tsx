@@ -44,6 +44,7 @@ function ChartContainer({
   children,
   config,
   initialDimension = INITIAL_DIMENSION,
+  style,
   ...props
 }: React.ComponentProps<"div"> & {
   config: ChartConfig
@@ -58,6 +59,23 @@ function ChartContainer({
   const uniqueId = React.useId()
   const chartId = `chart-${id ?? uniqueId.replace(/:/g, "")}`
 
+  // Chart series colors as CSS custom properties on the container, set through
+  // React's style prop (applied via the CSSOM, so the CSP needs no
+  // 'unsafe-inline' for style-src). Theme maps use light-dark(), which follows
+  // the app's `.dark` class via the color-scheme rules in index.css — this
+  // replaces the old <style> injection that CSP would block.
+  const chartVars = React.useMemo(() => {
+    const vars: Record<string, string> = {}
+    for (const [key, item] of Object.entries(config)) {
+      if (item.theme) {
+        vars[`--color-${key}`] = `light-dark(${item.theme.light}, ${item.theme.dark})`
+      } else if (item.color) {
+        vars[`--color-${key}`] = item.color
+      }
+    }
+    return vars
+  }, [config])
+
   return (
     <ChartContext.Provider value={{ config }}>
       <div
@@ -67,9 +85,9 @@ function ChartContainer({
           "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-hidden [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector]:outline-hidden [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-hidden",
           className
         )}
+        style={{ ...chartVars, ...style } as React.CSSProperties}
         {...props}
       >
-        <ChartStyle id={chartId} config={config} />
         <RechartsPrimitive.ResponsiveContainer
           initialDimension={initialDimension}
         >
@@ -77,39 +95,6 @@ function ChartContainer({
         </RechartsPrimitive.ResponsiveContainer>
       </div>
     </ChartContext.Provider>
-  )
-}
-
-const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
-  const colorConfig = Object.entries(config).filter(
-    ([, config]) => config.theme ?? config.color
-  )
-
-  if (!colorConfig.length) {
-    return null
-  }
-
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color =
-      itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ??
-      itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
-  })
-  .join("\n")}
-}
-`
-          )
-          .join("\n"),
-      }}
-    />
   )
 }
 
@@ -368,5 +353,4 @@ export {
   ChartTooltipContent,
   ChartLegend,
   ChartLegendContent,
-  ChartStyle,
 }

@@ -10,6 +10,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Lets light-dark() follow the app's .dark class toggle (App.tsx toggles
+   .dark on <html>). Chart series colors use light-dark() so they stay
+   theme-aware without an injected <style> element (see chart.tsx). */
+:root {
+  color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
+}
+
 @theme inline {
     --font-heading: 'Poppins', 'Inter Variable', sans-serif;
     --font-sans: 'Inter Variable', sans-serif;
