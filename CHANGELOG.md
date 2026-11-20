@@ -2,6 +2,15 @@
 
 All notable changes to LKR Rates. Dates are in Sri Lanka time.
 
+## 1.7.0 — 2026-11-20
+
+### Added
+- **Static mode on Cloudflare Pages.** `publish.mjs` fetches all banks once, writes `status.json` and one history file per currency, and uploads the site with Wrangler. It runs once and exits, so no server, Docker or database is needed. `scripts/install-publisher.ps1` schedules it on Windows (at logon and every 3 hours, no window) and `publish.bat` runs it by hand.
+- Page title and description for search: "Sri Lankan All Banks Exchange Rate Daily Update", with the bank names in the description; Open Graph tags; optional canonical link, `robots.txt` and `sitemap.xml` when `SITE_URL` is set.
+
+### Changed
+- The web app reads `/data/status.json` and `/data/history/<CUR>.json` instead of `/api/*`, and the Refresh button is gone (rates update every 3 hours). The Docker server and Telegram bot still work as before.
+
 ## 1.6.0 — 2026-11-03
 
 ### Added

@@ -1,6 +1,6 @@
 // Service worker: makes LKR Rates installable and keeps the last rates readable offline.
-// App files: cache first (Vite hashes their names). Rates API: network first, cached copy when offline.
-const CACHE = 'lkr-rates-v1';
+// App files: cache first (Vite hashes their names). Rates data: network first, cached copy when offline.
+const CACHE = 'lkr-rates-v2';
 const SHELL = ['/', '/logo.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', e => {
@@ -17,7 +17,7 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
 
-  if (url.pathname.startsWith('/api/')) {
+  if (url.pathname.startsWith('/data/')) {
     e.respondWith(fetch(e.request).then(res => {
       if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
       return res;

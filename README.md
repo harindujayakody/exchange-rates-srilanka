@@ -78,7 +78,29 @@ Get a free key at [openrouter.ai/keys](https://openrouter.ai/keys). On a host th
 
 Open the site in Chrome or Edge (Windows, macOS, Android) and choose **Install app** in the footer or the address bar. On iPhone, tap **Share**, then **Add to Home Screen**. Installing needs HTTPS (or `localhost`).
 
-## Run with Docker
+## Static site on Cloudflare Pages (no server)
+
+The simplest way to run LKR Rates: no server, no Docker, no database. A script on your own PC fetches the banks, writes the rates as JSON files and uploads the site to [Cloudflare Pages](https://pages.cloudflare.com), which hosts it for free. The script runs once every 3 hours and exits, so nothing stays running.
+
+```
+every 3 hours, on your PC:  publish.mjs ──► fetch 9 banks ──► web/dist/data/*.json ──► wrangler pages deploy
+visitors:                   Cloudflare Pages serves the app and reads /data/status.json and /data/history/USD.json
+```
+
+Because the fetch happens from your home connection, banks that block datacenter IPs (ComBank, BOC, Nations Trust) work without the push agent.
+
+1. Put `OPENROUTER_API_KEY` in `.env`, run `npm run build`, and sign in once with `npx wrangler login`.
+2. Optional: set `SITE_URL=https://your-domain` in `.env` so the page gets a canonical link, `robots.txt` and `sitemap.xml`.
+3. Run once by hand: double-click `publish.bat` (or `npm run publish:site`). The first run creates the Pages project named `exchange-rates` (change it with `CF_PAGES_PROJECT`).
+4. Schedule it on Windows (runs at logon and every 3 hours, no window, catches up after the PC was off):
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts\install-publisher.ps1
+   ```
+   Remove it with `scripts\install-publisher.ps1 -Uninstall`. Logs are in `publish.log`.
+
+What the static version does not have: the Telegram bot, the "Refresh" button and the live API (those need the server below). History is kept in `data/history.jsonl` on your PC. Back that folder up.
+
+## Run with Docker (server, Telegram bot and API)
 
 ```bash
 cp .env.example .env              # add your keys
