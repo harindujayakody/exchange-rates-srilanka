@@ -2,6 +2,11 @@
 
 All notable changes to LKR Rates. Dates are in Sri Lanka time.
 
+## 1.7.2 — 2026-11-20
+
+### Changed
+- Data-only mode writes a redirect page (`SITE_HOME`) at the root, so the data site sends visitors to the site that shows the rates.
+
 ## 1.7.1 — 2026-11-20
 
 ### Added
