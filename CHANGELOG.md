@@ -2,6 +2,11 @@
 
 All notable changes to LKR Rates. Dates are in Sri Lanka time.
 
+## 1.7.1 — 2026-11-20
+
+### Added
+- `DATA_ONLY=1` mode for `publish.mjs`: publishes only the JSON files under `DATA_PATH` (for example `d/<unlisted-id>`) with open CORS and no web page, for a site that shows the rates itself. Output goes to the git-ignored `dist-data/`.
+
 ## 1.7.0 — 2026-11-20
 
 ### Added

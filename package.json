@@ -1,6 +1,6 @@
 {
   "name": "lkr-rates",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Telegraphic transfer exchange rates from Sri Lankan banks, read by a free AI model and compared side by side.",
   "type": "module",
   "private": true,
