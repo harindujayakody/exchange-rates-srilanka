@@ -79,6 +79,8 @@ if (SITE_URL && !DATA_ONLY) {
   await writeFile(path.join(DIST, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`
     + ['/', '/history'].map(p => `  <url><loc>${SITE_URL}${p}</loc><lastmod>${day}</lastmod></url>`).join('\n') + '\n</urlset>\n');
 }
+// Data-only: the root just sends visitors to the site that shows the rates.
+if (DATA_ONLY && process.env.SITE_HOME) await writeFile(path.join(DIST, 'index.html'), `<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><meta http-equiv="refresh" content="0;url=${process.env.SITE_HOME}"><link rel="canonical" href="${process.env.SITE_HOME}"><a href="${process.env.SITE_HOME}">Exchange rates</a>`);
 const cors = `/${DATA_PATH}/*\n  Cache-Control: no-cache\n  Access-Control-Allow-Origin: *\n`;
 await writeFile(path.join(DIST, '_headers'), cors + (DATA_ONLY ? '' : '/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n'));
 
