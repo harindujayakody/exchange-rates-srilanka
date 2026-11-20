@@ -10,7 +10,7 @@ import { createCardRenderer } from './cardimage.mjs';
 // tt = [buying, selling] positions of the Telegraphic Transfer rates among a row's numbers (0 = first).
 // All checked against the live pages on 2026-11-02.
 // shortcut: if a bank reorders its table columns, update tt here.
-const BANKS = {
+export const BANKS = {
   combank: { name: 'Commercial Bank', short: 'Commercial', url: 'https://www.combank.lk/rates-tariff', tt: [4, 5] },
   boc: { name: 'Bank of Ceylon', short: 'BOC', url: 'https://www.boc.lk/rates-tariff', tt: [4, 5] },
   peoples: { name: "People's Bank", short: "People's", url: 'https://www.peoplesbank.lk/exchange-rates/', tt: [4, 5] },

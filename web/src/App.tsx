@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
-  AlertTriangle, ArrowDown, Clock, ArrowUp, Braces, Bug, ChartLine, History, Scale, Send, Download, ExternalLink, Landmark, Loader2, Moon, RefreshCw, Search, Share2, Sun, X,
+  AlertTriangle, ArrowDown, Clock, ArrowUp, Braces, Bug, ChartLine, History, Scale, Send, Download, ExternalLink, Landmark, Loader2, Moon, Search, Share2, Sun, X,
 } from "lucide-react"
 import { Line, LineChart, Tooltip as ChartTooltip, YAxis } from "recharts"
 import { toast } from "sonner"
@@ -24,10 +24,9 @@ export type Bank = {
 }
 type Status = {
   banks: Bank[]
-  lastRefresh: { at: string; trigger: "scheduled" | "manual" } | null
+  lastRefresh: { at: string; trigger: string } | null
   nextRefresh: string | null
   refreshing: boolean
-  manual: { limit: number; remaining: number; resetsAt: string | null }
 }
 export type Snapshot = { at: string; rates: Record<string, [number, number]> }
 type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }
@@ -101,7 +100,6 @@ export default function App() {
   const [status, setStatus] = useState<Status | null>(null)
   const [history, setHistory] = useState<Snapshot[] | null>(null) // null while the history is loading
   const [loadError, setLoadError] = useState(false)
-  const [manualRunning, setManualRunning] = useState(false)
   const [currency, setCurrency] = useState("USD")
   const [now, setNow] = useState(Date.now())
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"))
@@ -126,7 +124,7 @@ export default function App() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/status")
+      const res = await fetch("/data/status.json", { cache: "no-cache" })
       if (!res.ok) throw new Error()
       setStatus(await res.json())
       setLoadError(false)
@@ -136,18 +134,16 @@ export default function App() {
     setNow(Date.now())
   }, [])
 
-  // Poll fast while a refresh is running so new rates show up as soon as they land.
-  const busy = manualRunning || !!status?.refreshing
   useEffect(() => {
     load()
-    const id = setInterval(load, busy ? 3000 : 30000)
+    const id = setInterval(load, 300_000) // a static file; the PC publishes new rates every 3 hours
     return () => clearInterval(id)
-  }, [load, busy])
+  }, [load])
 
   const lastAt = status?.lastRefresh?.at
   useEffect(() => {
     setHistory(null)
-    fetch(`/api/history?currency=${currency}`).then((r) => (r.ok ? r.json() : [])).then(setHistory).catch(() => setHistory([]))
+    fetch(`/data/history/${currency}.json`, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : [])).then(setHistory).catch(() => setHistory([]))
   }, [currency, lastAt])
 
   useEffect(() => {
@@ -177,26 +173,10 @@ export default function App() {
     try { localStorage.setItem("theme", next ? "dark" : "light") } catch { /* private mode: theme just won't persist */ }
   }
 
-  async function refresh() {
-    setManualRunning(true)
-    const id = toast.loading("Fetching the latest rates from all banks…")
-    try {
-      const res = await fetch("/api/refresh", { method: "POST" })
-      const body = await res.json()
-      if (res.ok) toast.success("Rates updated", { id })
-      else toast.error(body.error ?? "Refresh failed", { id })
-    } catch {
-      toast.error("Could not reach the server. Check your connection and try again.", { id })
-    }
-    setManualRunning(false)
-    load()
-  }
-
   const currencies = useMemo(() => {
     const all = new Set(status?.banks.flatMap((b) => b.rates.map((r) => r.currency)))
     return { top: TOP.filter((c) => all.has(c)).slice(0, 10), all: [...all].sort() }
   }, [status])
-  const manualLeft = status?.manual.remaining ?? 0
 
   return (
     <TooltipProvider>
@@ -209,8 +189,8 @@ export default function App() {
             </a>
             <span className="hidden h-5 w-px bg-border lg:block" aria-hidden />
             <p className="hidden items-center gap-2 text-xs text-muted-foreground lg:flex" aria-live="polite">
-              <span className={`size-1.5 rounded-full bg-foreground ${busy ? "animate-pulse" : ""}`} aria-hidden />
-              {busy ? "Updating rates…" : status?.lastRefresh ? `Updated ${relative(status.lastRefresh.at, now)}` : "Loading rates…"}
+              <span className="size-1.5 rounded-full bg-foreground" aria-hidden />
+              {status?.lastRefresh ? `Updated ${relative(status.lastRefresh.at, now)}` : "Loading rates…"}
               <span className="text-border">/</span>
               {status?.banks.length ?? 9} banks
             </p>
@@ -244,22 +224,6 @@ export default function App() {
                 </TooltipTrigger>
                 <TooltipContent>Source on GitHub</TooltipContent>
               </Tooltip>
-              <span className="mx-1 h-5 w-px bg-border" aria-hidden />
-              <Tooltip>
-                <TooltipTrigger render={<span />} className="inline-flex">
-                  <button onClick={refresh} disabled={!status || busy || manualLeft === 0} aria-label={busy ? "Updating rates" : "Refresh rates"}
-                    className="inline-flex h-9 items-center gap-2 rounded-md bg-foreground px-3 text-sm font-semibold text-background transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40">
-                    {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />}
-                    <span className="hidden sm:inline">Refresh</span>
-                    <span className="font-mono text-xs opacity-70">{manualLeft}/{status?.manual.limit ?? 2}</span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {manualLeft === 0 && status?.manual.resetsAt
-                    ? `Manual limit reached. Next refresh ${relative(status.manual.resetsAt, now)}.`
-                    : `${manualLeft} of ${status?.manual.limit ?? 2} manual refreshes left this hour. Rates also update every 3 hours.`}
-                </TooltipContent>
-              </Tooltip>
             </nav>
           </div>
         </header>
@@ -267,7 +231,7 @@ export default function App() {
         <main className="mx-auto w-full max-w-6xl flex-1 space-y-10 px-4 py-6 sm:px-6 sm:py-8">
           {loadError && (
             <div role="alert" className="flex items-center gap-2 rounded-md border-2 border-down px-4 py-3 text-sm font-medium">
-              <AlertTriangle className="size-4 text-down" aria-hidden /> Can't reach the rates server. Retrying automatically.
+              <AlertTriangle className="size-4 text-down" aria-hidden /> Can't load the latest rates. Retrying automatically.
             </div>
           )}
 

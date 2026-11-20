@@ -1,6 +1,6 @@
 {
   "name": "lkr-rates",
-  "version": "1.0.0",
+  "version": "1.7.0",
   "description": "Telegraphic transfer exchange rates from Sri Lankan banks, read by a free AI model and compared side by side.",
   "type": "module",
   "private": true,
@@ -14,7 +14,8 @@
     "build": "cd web && npm ci && npm run build",
     "start": "node server.mjs",
     "dev": "node --env-file=.env server.mjs",
-    "test": "node test.mjs"
+    "test": "node test.mjs",
+    "publish:site": "node --env-file=.env publish.mjs"
   },
   "optionalDependencies": {
     "@napi-rs/canvas": "^1.1.0"
