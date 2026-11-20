@@ -98,6 +98,8 @@ Because the fetch happens from your home connection, banks that block datacenter
    ```
    Remove it with `scripts\install-publisher.ps1 -Uninstall`. Logs are in `publish.log`.
 
+**Data only.** If another site shows the rates itself (harindujayakody.com does), set `DATA_ONLY=1` and `DATA_PATH=d/<unlisted-id>` in `.env`. The publisher then uploads just `status.json` and the history files under that path, with no web page, and the other site reads them.
+
 What the static version does not have: the Telegram bot, the "Refresh" button and the live API (those need the server below). History is kept in `data/history.jsonl` on your PC. Back that folder up.
 
 ## Run with Docker (server, Telegram bot and API)
